@@ -141,7 +141,7 @@ fn unlock_with(app: AppHandle, state: State<App>, recovery: String) -> CommandRe
 #[tauri::command]
 fn get_dashboard(state: State<App>) -> CommandResult<Dashboard> {
     let tasks = state.with(|s| s.tasks())?;
-    Ok(dashboard::build(&tasks, Timestamp::now(), &state.tz))
+    Ok(dashboard::build(&tasks, Timestamp::now(), &state.tz, state.settings().urgent_score))
 }
 
 /// Finished jobs, newest first.

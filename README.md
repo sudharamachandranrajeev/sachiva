@@ -99,7 +99,8 @@ flowchart LR
 ```
 
 - The **score** (0 to 99) rises as the deadline gets close compared with how long the job takes. Important
-  jobs get more; overdue jobs climb further. Pinned jobs come first.
+  jobs get more; overdue jobs climb further. Pinned jobs come first,
+  but an urgent job always takes the **Do this now** card.
 - Jobs **waiting on someone** count for less until it is time to chase them.
 - **Reminders** are worked out from the same rules, so the dashboard and your notifications always agree.
 - Every number on the dashboard explains itself: tap it.

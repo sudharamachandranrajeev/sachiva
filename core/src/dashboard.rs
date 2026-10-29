@@ -47,7 +47,9 @@ pub struct Dashboard {
     pub figures: Vec<Figure>,
 }
 
-pub fn build(tasks: &[Task], now: Timestamp, tz: &TimeZone) -> Dashboard {
+/// `urgent_score` is the reminder setting: an urgent job takes the "now" card
+/// even over a pinned one, because pins are for order, not for emergencies.
+pub fn build(tasks: &[Task], now: Timestamp, tz: &TimeZone, urgent_score: u8) -> Dashboard {
     let end_of_day = now
         .to_zoned(tz.clone())
         .tomorrow()
@@ -75,7 +77,15 @@ pub fn build(tasks: &[Task], now: Timestamp, tz: &TimeZone) -> Dashboard {
         .count();
 
     // "Now" is the top job you can act on: not one still waiting on someone.
-    let pick = items.iter().position(|i| i.lane != Lane::Waiting || i.score >= 60);
+    // The most urgent job comes before pinned ones.
+    let actionable = |i: &Item| i.lane != Lane::Waiting || i.score >= 60;
+    let pick = items
+        .iter()
+        .enumerate()
+        .filter(|(_, i)| actionable(i) && i.score >= urgent_score)
+        .max_by_key(|(n, i)| (i.score, std::cmp::Reverse(*n)))
+        .map(|(n, _)| n)
+        .or_else(|| items.iter().position(actionable));
     let now_item = pick.map(|i| items.remove(i));
 
     let figures = vec![
@@ -144,7 +154,7 @@ mod tests {
         let mut done = Task::new("Order toner", made);
         done.status = Status::Done { at: at("2026-11-04T10:00:00Z") };
 
-        let d = build(&[tomorrow, wait, done, today, late], now, &tz);
+        let d = build(&[tomorrow, wait, done, today, late], now, &tz, 85);
         let now_item = d.now.unwrap();
         assert_eq!(now_item.task.title, "Return call REF-000214");
         assert_eq!(now_item.lane, Lane::Overdue);
@@ -161,8 +171,28 @@ mod tests {
     }
 
     #[test]
+    fn urgent_job_beats_a_pin_for_now() {
+        let tz = TimeZone::UTC;
+        let now = at("2026-11-04T12:00:00Z");
+        let made = at("2026-11-01T09:00:00Z");
+        let mut pinned = Task::new("Confirm clinic list", made);
+        pinned.due = Some(at("2026-11-04T17:00:00Z"));
+        pinned.pinned = true;
+        let mut slot = Task::new("Offer cancelled slot", made);
+        slot.appointment = Some(at("2026-11-04T15:00:00Z"));
+        slot.effort_min = Some(30);
+        slot.importance = crate::model::Importance::High;
+        let d = build(&[pinned.clone(), slot], now, &tz, 85);
+        assert_eq!(d.now.unwrap().task.title, "Offer cancelled slot");
+        assert_eq!(d.items[0].task.title, "Confirm clinic list");
+        // With nothing urgent, the pin wins.
+        let d = build(&[pinned], now, &tz, 85);
+        assert_eq!(d.now.unwrap().task.title, "Confirm clinic list");
+    }
+
+    #[test]
     fn empty_day() {
-        let d = build(&[], at("2026-11-04T12:00:00Z"), &TimeZone::UTC);
+        let d = build(&[], at("2026-11-04T12:00:00Z"), &TimeZone::UTC, 85);
         assert!(d.now.is_none() && d.items.is_empty());
         assert_eq!(d.figures[0].tone, "");
     }

@@ -63,7 +63,7 @@ fn main() {
     let tasks = [slot, call, scan, po, list, stats, quote, blind, stock, toner.clone()];
     let tz = TimeZone::try_system().unwrap_or(TimeZone::UTC);
     let out = serde_json::json!({
-        "dashboard": dashboard::build(&tasks, now, &tz),
+        "dashboard": dashboard::build(&tasks, now, &tz, Settings::default().urgent_score),
         "done": [toner],
         "settings": Settings::default(),
     });

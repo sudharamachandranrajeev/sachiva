@@ -144,7 +144,7 @@
       <p class="muted">
         0 to 99. It rises as a deadline gets close compared with how long the job takes, and for jobs you marked
         important. Overdue jobs climb further. Jobs waiting on someone count for less until it is time to chase them.
-        Pinned jobs always come first.
+        Pinned jobs come first, except that an urgent job always takes the "Do this now" card.
       </p>
     </div>
     <div class="card box">
