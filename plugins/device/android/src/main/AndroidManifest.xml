@@ -8,7 +8,7 @@
     <application>
         <!-- Hands a downloaded update to the system installer. -->
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name="dev.sachiva.device.UpdatesFileProvider"
             android:authorities="${applicationId}.sachiva.updates"
             android:exported="false"
             android:grantUriPermissions="true">

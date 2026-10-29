@@ -137,7 +137,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.SACHIVA_UPDATER_KEY_PASSWORD }}
         with:
           projectPath: app
-          tauriScript: npm run tauri --
+          tauriScript: npm run tauri
           args: --bundles ${{ matrix.bundles }}
           releaseId: ${{ needs.create.outputs.id }}
           uploadUpdaterJson: false
