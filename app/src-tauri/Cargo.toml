@@ -1,0 +1,28 @@
+[package]
+name = "sachiva"
+version = "0.1.0"
+description = "Admin support desk: priorities, deadlines and reminders"
+license = "MIT"
+edition = "2024"
+
+[lib]
+name = "sachiva_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+sachiva-core = { version = "0.1.0", path = "../../core" }
+tauri-plugin-sachiva-device = { version = "0.1.0", path = "../../plugins/device" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tauri = { version = "2.12.5", features = ["tray-icon"] }
+tauri-plugin-notification = "2.8.0"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+time = "0.3"

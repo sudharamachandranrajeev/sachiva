@@ -1,0 +1,259 @@
+/* Calm Ward: light sage and teal, Inter. Colours are tokens so phase 5 themes can swap them. */
+
+:root {
+  --bg: #eef3f1;
+  --panel: #ffffff;
+  --panel2: #f6f9f8;
+  --ink: #16302b;
+  --muted: #5d7570;
+  --line: #dbe5e2;
+  --accent: #1f7a6c;
+  --accent-soft: #d8ede8;
+  --on-accent: #ffffff;
+  --urgent: #c2410c;
+  --urgent-soft: #fde7da;
+  --warn: #a16207;
+  --warn-soft: #fbf0cf;
+  --ok: #15803d;
+  --shadow: 0 1px 2px rgba(22, 48, 43, 0.06), 0 8px 24px rgba(22, 48, 43, 0.06);
+  --r: 18px;
+  --font: 'Inter Variable', 'Inter', system-ui, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0f1a18;
+    --panel: #16231f;
+    --panel2: #1a2925;
+    --ink: #e3efec;
+    --muted: #93aaa4;
+    --line: #28403a;
+    --accent: #4fb3a2;
+    --accent-soft: #1c3a34;
+    --on-accent: #062520;
+    --urgent: #f08a5d;
+    --urgent-soft: #3d2219;
+    --warn: #e0b44c;
+    --warn-soft: #3a2f14;
+    --ok: #4ade80;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f1a18;
+  --panel: #16231f;
+  --panel2: #1a2925;
+  --ink: #e3efec;
+  --muted: #93aaa4;
+  --line: #28403a;
+  --accent: #4fb3a2;
+  --accent-soft: #1c3a34;
+  --on-accent: #062520;
+  --urgent: #f08a5d;
+  --urgent-soft: #3d2219;
+  --warn: #e0b44c;
+  --warn-soft: #3a2f14;
+  --ok: #4ade80;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s, color 0.25s;
+}
+
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before {
+  transition: none !important;
+  animation: none !important;
+  scroll-behavior: auto !important;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+h1 {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  transition: background-color 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--accent-soft);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn.p {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn.danger {
+  color: var(--urgent);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input[type='text'],
+input[type='number'],
+input[type='search'],
+input[type='datetime-local'],
+input[type='time'],
+input:not([type]),
+select,
+textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+label.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+label.field :is(input, select, textarea) {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+/* "What is this?" panels on every page. */
+details.explain {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+details.explain summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+}
+
+details.explain summary::-webkit-details-marker {
+  display: none;
+}
+
+details.explain summary::before {
+  content: '? ';
+}
+
+details.explain p {
+  margin-top: 6px;
+  max-width: 68ch;
+}
+
+.pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pill.bad {
+  background: var(--urgent-soft);
+  color: var(--urgent);
+}
+
+.pill.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

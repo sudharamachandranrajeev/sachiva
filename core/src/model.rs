@@ -128,3 +128,75 @@ impl Task {
         }
     }
 }
+
+/// Limits on what a task may hold; the UI is not trusted to enforce them.
+pub const MAX_TITLE: usize = 300;
+pub const MAX_NOTES: usize = 20_000;
+pub const MAX_ITEMS: usize = 200;
+
+impl Task {
+    /// Checks a task coming from the UI. Returns a message for the user.
+    pub fn validate(&self) -> Result<(), String> {
+        let title = self.title.trim();
+        if title.is_empty() {
+            return Err("Give the job a title.".into());
+        }
+        if title.chars().count() > MAX_TITLE {
+            return Err(format!("Keep the title under {MAX_TITLE} characters; put the rest in notes."));
+        }
+        if self.notes.chars().count() > MAX_NOTES {
+            return Err(format!("Notes can hold up to {MAX_NOTES} characters."));
+        }
+        if self.checklist.len() > MAX_ITEMS || self.tags.len() > MAX_ITEMS {
+            return Err(format!("A job can have up to {MAX_ITEMS} checklist items and tags."));
+        }
+        if self.checklist.iter().any(|c| c.text.chars().count() > MAX_TITLE) || self.site.chars().count() > MAX_TITLE {
+            return Err(format!("Checklist items and the site name are limited to {MAX_TITLE} characters."));
+        }
+        if self.effort_min.is_some_and(|m| m > 7 * 24 * 60) {
+            return Err("Effort is in minutes and can be at most a week.".into());
+        }
+        if let Some(r) = &self.repeat {
+            let n = match r {
+                Repeat::Daily { every } | Repeat::Weekly { every, .. } | Repeat::Monthly { every, .. } => *every,
+                Repeat::AfterDone { days } => *days,
+            };
+            if !(1..=366).contains(&n) {
+                return Err("A repeat must be between 1 and 366.".into());
+            }
+            if let Repeat::Monthly { day, .. } = r
+                && !(1..=31).contains(day)
+            {
+                return Err("Pick a day of the month from 1 to 31.".into());
+            }
+        }
+        if uuid::Uuid::parse_str(&self.id).is_err() {
+            return Err("This job has a broken id.".into());
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validation() {
+        let now: Timestamp = "2026-11-04T09:00:00Z".parse().unwrap();
+        let mut t = Task::new("Order gloves", now);
+        assert!(t.validate().is_ok());
+        t.title = "  ".into();
+        assert!(t.validate().is_err());
+        t.title = "x".repeat(301);
+        assert!(t.validate().is_err());
+        t.title = "ok".into();
+        t.repeat = Some(Repeat::Daily { every: 0 });
+        assert!(t.validate().is_err());
+        t.repeat = Some(Repeat::Monthly { every: 1, day: 32 });
+        assert!(t.validate().is_err());
+        t.repeat = None;
+        t.id = "../etc".into();
+        assert!(t.validate().is_err());
+    }
+}
