@@ -94,8 +94,10 @@ jobs:
           VERSION: ${{ needs.check.outputs.version }}
         run: |
           awk -v v="## [$VERSION]" 'index($0, v) == 1 { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md > notes.md
-          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "Sachiva $VERSION" --notes-file notes.md
-          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id")
+          # The create call returns the id. Listing releases straight after can miss the new draft.
+          id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" -f tag_name="$GITHUB_REF_NAME" \
+            -f name="Sachiva $VERSION" -F body=@notes.md -F draft=true --jq .id)
+          [[ $id =~ ^[0-9]+$ ]] || { echo "no release id: '$id'" >&2; exit 1; }
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
   desktop:
