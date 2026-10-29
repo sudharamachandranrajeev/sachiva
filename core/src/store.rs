@@ -1,6 +1,8 @@
 //! The encrypted local store (SQLCipher). Every change is written at once and
 //! recorded in `history`, so it can be undone; deleting moves a task to the
 //! trash first. Backups are encrypted copies made with `sqlcipher_export`.
+//! A backup is never opened in place: [`inspect`] and [`restore_copy`] work on
+//! a copy, so a file the user picks is never changed.
 
 use std::path::{Path, PathBuf};
 
@@ -27,6 +29,36 @@ pub enum Error {
     NotFound(String),
     #[error("this database was made by a newer Sachiva (schema {0}); update the app")]
     TooNew(i64),
+}
+
+/// What locks a database: the device key (raw, no key derivation), or a
+/// passphrase the user chose for an exported file (SQLCipher's own PBKDF2).
+#[derive(Clone, Copy)]
+pub enum Secret<'a> {
+    Key(&'a [u8; 32]),
+    Passphrase(&'a str),
+}
+
+impl Secret<'_> {
+    /// The value for `PRAGMA key` or `ATTACH ... KEY`.
+    fn sql(&self) -> String {
+        match self {
+            Secret::Key(k) => key_literal(k),
+            Secret::Passphrase(p) => (*p).to_owned(),
+        }
+    }
+}
+
+/// What a backup holds, shown before restoring it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Summary {
+    pub schema: i64,
+    pub open_jobs: usize,
+    pub done_jobs: usize,
+    pub trashed: usize,
+    /// When a job was last changed, if any.
+    pub last_change: Option<Timestamp>,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -74,7 +106,7 @@ impl Store {
     /// Open (or create) the database at `path` with a 32-byte key.
     pub fn open(path: &Path, key: &[u8; 32]) -> Result<Store> {
         let conn = Connection::open(path)?;
-        apply_key(&conn, key)?;
+        apply_key(&conn, Secret::Key(key))?;
         Store::init(conn)
     }
 
@@ -244,19 +276,14 @@ impl Store {
     }
 
     /// Write an encrypted copy to `path` (which must not exist), locked with
-    /// `key`: the device key for automatic backups, or a passphrase-derived
-    /// key for a file the user moves to another device.
-    pub fn export(&self, path: &Path, key: &[u8; 32]) -> Result<()> {
-        if path.exists() {
-            return Err(Error::Io(std::io::Error::new(std::io::ErrorKind::AlreadyExists, path.display().to_string())));
-        }
-        let p = path.to_str().ok_or_else(|| Error::Io(std::io::Error::other("backup path is not UTF-8")))?;
-        self.conn.execute("ATTACH DATABASE ?1 AS backup KEY ?2", params![p, key_literal(key)])?;
-        let r = self.conn.query_row("SELECT sqlcipher_export('backup')", [], |_| Ok(())).and_then(|_| {
-            self.conn.execute_batch(&format!("PRAGMA backup.user_version = {}", self.schema_version().unwrap_or(0)))
-        });
-        self.conn.execute("DETACH DATABASE backup", [])?;
-        Ok(r?)
+    /// the device key for automatic backups, or a passphrase for a file the
+    /// user moves to another device.
+    pub fn export(&self, path: &Path, secret: Secret) -> Result<()> {
+        export_conn(&self.conn, path, secret)
+    }
+
+    pub fn summary(&self) -> Result<Summary> {
+        summarise(&self.conn)
     }
 
     /// Daily backup into `dir`, keeping the newest `keep`. Returns the new
@@ -270,20 +297,35 @@ impl Store {
         }
         let tmp = dir.join(format!("{name}.partial"));
         let _ = std::fs::remove_file(&tmp);
-        self.export(&tmp, key)?;
+        self.export(&tmp, Secret::Key(key))?;
         std::fs::rename(&tmp, &path)?;
-        let mut all: Vec<PathBuf> = std::fs::read_dir(dir)?
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| {
-                p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("sachiva-") && n.ends_with(".db"))
-            })
-            .collect();
-        all.sort();
-        let excess = all.len().saturating_sub(keep);
-        for old in &all[..excess] {
-            std::fs::remove_file(old)?;
-        }
+        prune(dir, "sachiva-", keep)?;
         Ok(Some(path))
+    }
+
+    /// Backup made just before installing another version, named after the
+    /// version running now, so going back can restore it. Kept apart from
+    /// the daily ones: the newest `keep` stay.
+    pub fn pre_update_backup(
+        &self,
+        dir: &Path,
+        key: &[u8; 32],
+        version: &str,
+        now: Timestamp,
+        keep: usize,
+    ) -> Result<PathBuf> {
+        if version.is_empty() || !version.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-') {
+            return Err(Error::Io(std::io::Error::other(format!("odd version {version:?}"))));
+        }
+        std::fs::create_dir_all(dir)?;
+        let name = format!("{PRE_UPDATE}{}-{version}.db", now.strftime("%Y-%m-%d-%H%M%S"));
+        let path = dir.join(&name);
+        let tmp = dir.join(format!("{name}.partial"));
+        let _ = std::fs::remove_file(&tmp);
+        self.export(&tmp, Secret::Key(key))?;
+        std::fs::rename(&tmp, &path)?;
+        prune(dir, PRE_UPDATE, keep)?;
+        Ok(path)
     }
 
     /// Run one change in a transaction; all its rows share one undo group.
@@ -319,8 +361,99 @@ fn record(tx: &rusqlite::Transaction, group: i64, id: &str, label: &str, now: Ti
     Ok(())
 }
 
-fn apply_key(conn: &Connection, key: &[u8; 32]) -> Result<()> {
-    conn.execute_batch(&format!("PRAGMA key = \"{}\";", key_literal(key)))?;
+/// Name prefix of the backups made before an update.
+pub const PRE_UPDATE: &str = "pre-update-";
+
+/// Keep the newest `keep` backups whose names start with `prefix`. Names
+/// carry the date first, so name order is age order.
+fn prune(dir: &Path, prefix: &str, keep: usize) -> Result<()> {
+    let mut all: Vec<PathBuf> = std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with(prefix) && n.ends_with(".db")))
+        .collect();
+    all.sort();
+    let excess = all.len().saturating_sub(keep);
+    for old in &all[..excess] {
+        std::fs::remove_file(old)?;
+    }
+    Ok(())
+}
+
+fn export_conn(conn: &Connection, path: &Path, secret: Secret) -> Result<()> {
+    if path.exists() {
+        return Err(Error::Io(std::io::Error::new(std::io::ErrorKind::AlreadyExists, path.display().to_string())));
+    }
+    let p = path.to_str().ok_or_else(|| Error::Io(std::io::Error::other("backup path is not UTF-8")))?;
+    let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    conn.execute("ATTACH DATABASE ?1 AS backup KEY ?2", params![p, secret.sql()])?;
+    let r = conn
+        .query_row("SELECT sqlcipher_export('backup')", [], |_| Ok(()))
+        .and_then(|_| conn.execute_batch(&format!("PRAGMA backup.user_version = {version}")));
+    conn.execute("DETACH DATABASE backup", [])?;
+    Ok(r?)
+}
+
+fn summarise(conn: &Connection) -> Result<Summary> {
+    let schema: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    let mut st = conn.prepare("SELECT json, deleted_at FROM tasks")?;
+    let rows = st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<i64>>(1)?)))?;
+    let mut sum = Summary { schema, open_jobs: 0, done_jobs: 0, trashed: 0, last_change: None };
+    for row in rows {
+        let (json, deleted) = row?;
+        let task: Task = serde_json::from_str(&json)?;
+        sum.last_change = sum.last_change.max(Some(task.updated_at));
+        match (deleted, &task.status) {
+            (Some(_), _) => sum.trashed += 1,
+            (None, crate::model::Status::Done { .. }) => sum.done_jobs += 1,
+            (None, _) => sum.open_jobs += 1,
+        }
+    }
+    Ok(sum)
+}
+
+/// Open a copy of the backup at `src` (in `work`, removed again) and say what
+/// it holds. `src` itself is only read.
+pub fn inspect(src: &Path, secret: Secret, work: &Path) -> Result<Summary> {
+    let copy = work.join("inspect.db");
+    let r = with_copy(src, secret, &copy, summarise);
+    let _ = std::fs::remove_file(&copy);
+    r
+}
+
+/// Turn the backup at `src` into a database locked with the device `key`,
+/// written to `dest` (which must not exist). Refuses a backup from a newer
+/// Sachiva. `src` itself is only read; the caller swaps `dest` in.
+pub fn restore_copy(src: &Path, secret: Secret, dest: &Path, key: &[u8; 32]) -> Result<Summary> {
+    let copy = dest.with_extension("source");
+    let r = with_copy(src, secret, &copy, |conn| {
+        let sum = summarise(conn)?;
+        export_conn(conn, dest, Secret::Key(key))?;
+        Ok(sum)
+    });
+    let _ = std::fs::remove_file(&copy);
+    if r.is_err() {
+        let _ = std::fs::remove_file(dest);
+    }
+    r
+}
+
+fn with_copy<T>(src: &Path, secret: Secret, copy: &Path, f: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
+    let _ = std::fs::remove_file(copy);
+    std::fs::copy(src, copy)?;
+    let conn = Connection::open(copy)?;
+    apply_key(&conn, secret)?;
+    if conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get::<_, i64>(0)).is_err() {
+        return Err(Error::WrongKey);
+    }
+    let v: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    if v > MIGRATIONS.len() as i64 {
+        return Err(Error::TooNew(v));
+    }
+    f(&conn)
+}
+
+fn apply_key(conn: &Connection, secret: Secret) -> Result<()> {
+    conn.pragma_update(None, "key", secret.sql())?;
     Ok(())
 }
 
@@ -412,10 +545,10 @@ mod tests {
             let copy = Store::open(&b, &KEY).unwrap();
             assert_eq!(copy.tasks().unwrap()[0].title, "Confirm clinic list");
             assert_eq!(copy.schema_version().unwrap(), MIGRATIONS.len() as i64);
-            // A backup locked with another key (a passphrase file).
+            // A backup locked with another key.
             let other = [9u8; 32];
             let moved = dir.path().join("moved.db");
-            s.export(&moved, &other).unwrap();
+            s.export(&moved, Secret::Key(&other)).unwrap();
             assert!(matches!(Store::open(&moved, &KEY), Err(Error::WrongKey)));
             assert_eq!(Store::open(&moved, &other).unwrap().tasks().unwrap().len(), 1);
         }
@@ -439,5 +572,78 @@ mod tests {
             std::fs::read_dir(&b).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
         names.sort();
         assert_eq!(names, ["sachiva-2026-11-02.db", "sachiva-2026-11-03.db"]);
+    }
+
+    #[test]
+    fn passphrase_export_restores_under_the_device_key_and_leaves_the_file_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let now = at("2026-11-04T09:00:00Z");
+        let mut s = Store::open(&dir.path().join("a.db"), &KEY).unwrap();
+        s.save(&Task::new("Order gloves", now), now).unwrap();
+        let mut done = Task::new("Book interpreter", now);
+        done.updated_at = at("2026-11-05T10:00:00Z");
+        s.save(&done, now).unwrap();
+        s.complete(&done.id, at("2026-11-05T10:00:00Z"), &TimeZone::UTC).unwrap();
+        let gone = Task::new("Old note", now);
+        s.save(&gone, now).unwrap();
+        s.delete(&gone.id, now).unwrap();
+
+        let file = dir.path().join("export.db");
+        s.export(&file, Secret::Passphrase("correct horse 'battery'")).unwrap();
+        let before = std::fs::read(&file).unwrap();
+        assert!(matches!(inspect(&file, Secret::Passphrase("wrong"), dir.path()), Err(Error::WrongKey)));
+        assert!(matches!(inspect(&file, Secret::Key(&KEY), dir.path()), Err(Error::WrongKey)));
+        let sum = inspect(&file, Secret::Passphrase("correct horse 'battery'"), dir.path()).unwrap();
+        assert_eq!((sum.open_jobs, sum.done_jobs, sum.trashed), (1, 1, 1));
+        assert_eq!(sum.schema, MIGRATIONS.len() as i64);
+
+        let new_key = [3u8; 32];
+        let dest = dir.path().join("restored.db");
+        restore_copy(&file, Secret::Passphrase("correct horse 'battery'"), &dest, &new_key).unwrap();
+        assert_eq!(std::fs::read(&file).unwrap(), before, "the picked file must not change");
+        let r = Store::open(&dest, &new_key).unwrap();
+        assert_eq!(r.tasks().unwrap().len(), 2);
+        assert_eq!(r.trash().unwrap().len(), 1);
+        // Leftovers from the work copy are gone.
+        assert!(!dest.with_extension("source").exists());
+        assert!(!dir.path().join("inspect.db").exists());
+    }
+
+    #[test]
+    fn a_backup_from_a_newer_sachiva_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("new.db");
+        {
+            let s = Store::open(&path, &KEY).unwrap();
+            s.conn.pragma_update(None, "user_version", 99).unwrap();
+        }
+        let dest = dir.path().join("out.db");
+        assert!(matches!(restore_copy(&path, Secret::Key(&KEY), &dest, &KEY), Err(Error::TooNew(99))));
+        assert!(!dest.exists());
+    }
+
+    #[test]
+    fn pre_update_backups_are_kept_apart_from_daily_ones() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = Store::open(&dir.path().join("a.db"), &KEY).unwrap();
+        let b = dir.path().join("b");
+        s.daily_backup(&b, &KEY, at("2026-11-01T09:00:00Z"), 1).unwrap();
+        for (i, day) in ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05"].iter().enumerate() {
+            s.pre_update_backup(&b, &KEY, &format!("0.1.{i}"), at(&format!("{day}T09:00:00Z")), 3).unwrap();
+        }
+        s.daily_backup(&b, &KEY, at("2026-11-06T09:00:00Z"), 1).unwrap();
+        let mut names: Vec<_> =
+            std::fs::read_dir(&b).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+        names.sort();
+        assert_eq!(
+            names,
+            [
+                "pre-update-2026-11-03-090000-0.1.1.db",
+                "pre-update-2026-11-04-090000-0.1.2.db",
+                "pre-update-2026-11-05-090000-0.1.3.db",
+                "sachiva-2026-11-06.db"
+            ]
+        );
+        assert!(s.pre_update_backup(&b, &KEY, "../x", at("2026-11-07T09:00:00Z"), 3).is_err());
     }
 }

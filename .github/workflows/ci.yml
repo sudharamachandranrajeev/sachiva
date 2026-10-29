@@ -39,15 +39,16 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
-      - name: Build AppImage and deb
+      # Update files are only signed in release.yml; CI has no signing key.
+      - name: Build AppImage
         working-directory: app
-        run: npm run tauri build -- --bundles appimage,deb
+        run: npm run tauri build -- --bundles appimage --config '{"bundle":{"createUpdaterArtifacts":false}}'
+      - name: Starts and reports its version
+        run: target/release/sachiva --version
       - uses: actions/upload-artifact@v4
         with:
           name: sachiva-linux
-          path: |
-            target/release/bundle/appimage/*.AppImage
-            target/release/bundle/deb/*.deb
+          path: target/release/bundle/appimage/*.AppImage
 
   windows:
     runs-on: windows-latest
@@ -71,7 +72,8 @@ jobs:
       - run: cargo test --workspace
       - name: Build installer
         working-directory: app
-        run: npm run tauri build -- --bundles nsis
+        shell: bash
+        run: npm run tauri build -- --bundles nsis --config '{"bundle":{"createUpdaterArtifacts":false}}'
       - uses: actions/upload-artifact@v4
         with:
           name: sachiva-windows

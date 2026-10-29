@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Sachiva
+Comment=Admin support desk: priorities, deadlines and reminders
+Exec=sachiva
+Icon=sachiva
+Terminal=false
+Categories=Office;ProjectManagement;
+StartupWMClass=sachiva

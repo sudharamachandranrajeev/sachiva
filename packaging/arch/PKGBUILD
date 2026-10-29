@@ -1,0 +1,24 @@
+# Arch Linux package for Sachiva, built in CI from the release binary
+# (see .github/workflows/release.yml). To build it yourself: put a built
+# `sachiva` binary next to this file and run `SACHIVA_VERSION=x.y.z makepkg`.
+pkgname=sachiva
+pkgver=${SACHIVA_VERSION:-0.0.0}
+pkgrel=1
+pkgdesc='Admin support desk: priorities, deadlines and reminders'
+arch=(x86_64)
+url='https://github.com/sudharamachandranrajeev/sachiva'
+license=(MIT)
+depends=(webkit2gtk-4.1 gtk3 libayatana-appindicator librsvg hicolor-icon-theme polkit)
+options=(!strip !debug)
+
+package() {
+  install -Dm755 "$startdir/sachiva" "$pkgdir/usr/bin/sachiva"
+  install -Dm644 "$startdir/sachiva.desktop" "$pkgdir/usr/share/applications/sachiva.desktop"
+  install -Dm644 "$startdir/icons/32x32.png" "$pkgdir/usr/share/icons/hicolor/32x32/apps/sachiva.png"
+  install -Dm644 "$startdir/icons/128x128.png" "$pkgdir/usr/share/icons/hicolor/128x128/apps/sachiva.png"
+  install -Dm644 "$startdir/icons/128x128@2x.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/sachiva.png"
+  install -Dm644 "$startdir/LICENSE" "$pkgdir/usr/share/licenses/sachiva/LICENSE"
+  # Tells Sachiva it was installed with pacman, so it updates through pacman.
+  install -dm755 "$pkgdir/usr/lib/sachiva"
+  echo pacman >"$pkgdir/usr/lib/sachiva/install-type"
+}

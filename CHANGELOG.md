@@ -1,8 +1,26 @@
 # Changelog
 
-## Unreleased
+## [0.1.0]
 
-Phase 1, the foundation. Not yet released.
+The first release (alpha). Installers for Windows, Linux and Android.
+
+Releases and updates:
+
+- Windows installer (no admin rights needed) and a portable zip. Linux AppImage and Arch package.
+  Android APK. Every release lists SHA-256 checksums.
+- Checks for a new version at start and asks before installing. Backs up your data first. Every
+  download is checked against Sachiva's signature (desktop) or checksum and signing key (Android).
+- Go back to the version before the last update (desktop), restoring the matching backup if needed.
+- The portable version tells you when a new version is out, since it cannot update itself.
+- Backups screen: daily, before updates, made by you, before a restore. Restore any of them after
+  seeing what it holds; your current data is backed up first.
+- Export a copy locked with a passphrase, and restore from such a file or from another device's
+  backup with its recovery key.
+- Report a problem / Suggest a feature: opens a GitHub form with version, system, look settings and
+  the last three error messages filled in. No job text.
+- First-run steps: reminders, updates, look. All skippable.
+
+The foundation:
 
 - Jobs with deadline, appointment time, work needed, importance, site, tags, checklist and notes.
 - "Waiting on someone" with a chase date.

@@ -1,15 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { getVersion } from '@tauri-apps/api/app'
-  import { api, message, type AlarmAccess, type Backups, type ReminderSettings } from './api'
-  import { app } from './state.svelte'
+  import { api, message, type AlarmAccess, type Page, type ReminderSettings } from './api'
+  import { app, recentErrors } from './state.svelte'
   import { prefs, type Motion, type Theme } from './prefs.svelte'
+  import BackupsPanel from './BackupsPanel.svelte'
+  import UpdatesPanel from './UpdatesPanel.svelte'
 
   let { alarms, onAlarms }: { alarms: AlarmAccess | null; onAlarms: () => void } = $props()
 
   let s = $state<ReminderSettings | null>(null)
   let saved = $state<ReminderSettings | null>(null)
-  let backups = $state<Backups | null>(null)
+  let autostart = $state<boolean | null>(null)
   let key = $state('')
   let version = $state('')
   let error = $state('')
@@ -26,8 +28,8 @@
     try {
       s = await api.settings()
       saved = $state.snapshot(s)
-      backups = await api.backups()
       version = await getVersion()
+      if (app.status?.platform !== 'android') autostart = await api.autostart()
     } catch (e) {
       error = message(e)
     }
@@ -46,11 +48,20 @@
     }
   }
 
-  async function backupNow() {
+  async function setAutostart(on: boolean) {
     try {
-      const name = await api.backupNow()
-      backups = await api.backups()
-      app.say(`Backed up: ${name}.`)
+      await api.setAutostart(on)
+      autostart = await api.autostart()
+    } catch (e) {
+      app.say(message(e), { error: true })
+    }
+  }
+
+  // Opens GitHub in the browser with the details filled in. Nothing is sent
+  // until you press Submit there, and no job text is included.
+  async function report(page: Page) {
+    try {
+      await api.openPage(page, { theme: prefs.theme, motion: prefs.motion, errors: recentErrors().join('\n') })
     } catch (e) {
       app.say(message(e), { error: true })
     }
@@ -192,35 +203,38 @@
     <button class="btn" onclick={showKey}>Show recovery key</button>
   {/if}
 
-  <h3>Backups</h3>
-  <p class="hint">
-    Sachiva backs up once a day when it is running and keeps the last 14 daily backups. Backups are encrypted with the
-    same recovery key. Restoring from a backup arrives in the next release.
-  </p>
-  {#if backups}
-    <p class="hint">Folder: <code>{backups.folder}</code></p>
-    {#if backups.files.length}
-      <ul class="files">
-        {#each backups.files.slice(0, 5) as f (f)}<li><code>{f}</code></li>{/each}
-      </ul>
-      {#if backups.files.length > 5}<p class="hint">and {backups.files.length - 5} older.</p>{/if}
-    {:else}
-      <p class="hint">No backups yet.</p>
-    {/if}
-  {/if}
-  <button class="btn" onclick={backupNow}>Back up now</button>
+  <BackupsPanel />
 
   <h3>Deleted jobs</h3>
   <p class="hint">Deleted jobs stay in the trash for 30 days, so you can restore them from Tasks, then go for good.</p>
 </section>
 
+<UpdatesPanel />
+
+<section class="card">
+  <h2>Help and feedback</h2>
+  <p class="muted">
+    These open a form on GitHub in your browser, with Sachiva's version, your system, your look settings and the last
+    three error messages filled in. No job text is included. Nothing is sent until you press Submit there, and you can
+    edit everything first. You need a free GitHub account.
+  </p>
+  <div class="row">
+    <button class="btn" onclick={() => report('bug')}>Report a problem</button>
+    <button class="btn" onclick={() => report('idea')}>Suggest a feature</button>
+  </div>
+</section>
+
 <section class="card">
   <h2>About</h2>
   <p class="muted">Sachiva {version}. Free and open source under the MIT licence.</p>
-  {#if app.status?.platform !== 'android'}
+  {#if autostart !== null}
+    <label class="check-row">
+      <input type="checkbox" checked={autostart} onchange={(e) => setAutostart(e.currentTarget.checked)} />
+      Start Sachiva with the computer
+    </label>
     <p class="hint">
-      Sachiva starts with your computer and keeps running in the tray, so reminders arrive with the window closed. Quit
-      from the tray icon to stop it.
+      Sachiva keeps running in the tray, so reminders arrive with the window closed. If it does not start with the
+      computer, reminders only come after you open it. Quit from the tray icon to stop it.
     </p>
   {/if}
 </section>
@@ -274,8 +288,10 @@
     font-size: 12px;
     overflow-wrap: anywhere;
   }
-  .files {
-    list-style: none;
+  .row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
   }
   .error {
     color: var(--urgent);

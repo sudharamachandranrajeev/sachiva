@@ -36,6 +36,7 @@ class AppState {
   }
 
   say(text: string, { undo = false, error = false } = {}) {
+    if (error) remember(text)
     clearTimeout(this.#timer)
     this.toast = { text, undo, error }
     this.#timer = setTimeout(() => (this.toast = null), undo ? 8000 : 4000)
@@ -83,3 +84,26 @@ class AppState {
 }
 
 export const app = new AppState()
+
+// The last few error messages, for "Report a problem". Messages only: they
+// are Sachiva's own wording and never contain job text.
+const ERRORS = 'sachiva.errors'
+
+function remember(text: string) {
+  try {
+    const list: string[] = JSON.parse(localStorage.getItem(ERRORS) ?? '[]')
+    const line = `${new Date().toISOString().slice(0, 16)} ${text}`
+    localStorage.setItem(ERRORS, JSON.stringify([line, ...list].slice(0, 3)))
+  } catch {
+    // Storage blocked: the report goes without them.
+  }
+}
+
+export function recentErrors(): string[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(ERRORS) ?? '[]')
+    return Array.isArray(list) ? list.filter((x) => typeof x === 'string').slice(0, 3) : []
+  } catch {
+    return []
+  }
+}

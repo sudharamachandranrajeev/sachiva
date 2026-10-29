@@ -26,8 +26,8 @@ It is built for confidential settings. It holds **reference codes only**, never 
 warns you if something you type looks like a health number, phone number, birth date or address.
 
 > [!NOTE]
-> Sachiva is in early development (alpha). There are no installers yet: the first release comes with the
-> next phase. See the [CHANGELOG](CHANGELOG.md).
+> Sachiva is in early development (alpha). Keep the recovery key it gives you on paper, and expect
+> changes. See the [CHANGELOG](CHANGELOG.md).
 
 ## ✨ What it does
 
@@ -42,6 +42,8 @@ warns you if something you type looks like a health number, phone number, birth 
 - 🛡️ **Confidentiality check** – warns, before you keep a job, if the text may identify a person.
 - ↩️ **Undo and trash** – undo any change; deleted jobs stay restorable for 30 days.
 - 🔒 **Encrypted and offline** – your data stays on your device in an encrypted database, with a daily backup.
+- 💾 **Backup and restore** – see what a backup holds before restoring it; export a copy locked with a passphrase.
+- ⬆️ **Careful updates** – checks at start, asks first, backs up first, and lets you go back a version.
 
 ## 📸 Screenshots
 
@@ -59,12 +61,12 @@ warns you if something you type looks like a health number, phone number, birth 
   <tr>
     <td><img src="docs/screenshots/phone.png" alt="Dashboard on a phone" width="200"></td>
     <td><img src="docs/screenshots/recovery.png" alt="First-run recovery key screen" width="280"></td>
-    <td></td>
+    <td><img src="docs/screenshots/update.png" alt="A new version is out: install and restart, or later" width="280"></td>
   </tr>
   <tr>
     <td align="center">On a phone</td>
     <td align="center">Your recovery key</td>
-    <td></td>
+    <td align="center">Asks before updating</td>
   </tr>
 </table>
 
@@ -72,8 +74,76 @@ All screenshots use made-up demo data.
 
 ## 🚀 Get started
 
-Installers for Windows, Linux and Android arrive with the first release. Until then, you can build Sachiva
-yourself: see [For developers](#%EF%B8%8F-for-developers).
+Download from the [latest release](https://github.com/sudharamachandranrajeev/sachiva/releases/latest). Pick the file for your device:
+
+| Device | File | Updates itself |
+| --- | --- | --- |
+| Windows 10 or 11 | `Sachiva_<version>_x64-setup.exe` | Yes |
+| Windows, no install | `Sachiva_<version>_x64_portable.zip` | No: it tells you when a new version is out |
+| Linux, any | `Sachiva_<version>_amd64.AppImage` | Yes |
+| Arch Linux | `sachiva-<version>-1-x86_64.pkg.tar.zst` | Yes, through pacman |
+| Android 8 or newer (64-bit) | `Sachiva_<version>_aarch64.apk` | Yes, after you confirm |
+
+<details>
+<summary><b>Windows installer</b></summary>
+
+1. Download `Sachiva_<version>_x64-setup.exe`.
+2. Open it. Windows may say "Windows protected your PC", because Sachiva has no paid code-signing
+   certificate. Choose **More info**, then **Run anyway**.
+3. It installs for your Windows account only, with no admin password, into
+   `%LOCALAPPDATA%\Programs\Sachiva`, and adds Sachiva to the Start menu.
+4. To remove it: **Settings** → **Apps** → **Sachiva** → **Uninstall**. Your data stays in
+   `%APPDATA%\dev.sachiva.sachiva` until you delete that folder.
+</details>
+
+<details>
+<summary><b>Windows portable</b></summary>
+
+1. Download `Sachiva_<version>_x64_portable.zip` and unzip it anywhere, for example on a USB stick.
+2. Open `sachiva.exe` in the `Sachiva` folder. The same Windows warning as above may appear.
+3. Your data is kept in your Windows profile, not in the folder. When Sachiva says a new version is
+   out, download the new zip and replace the files in the folder.
+</details>
+
+<details>
+<summary><b>Linux: AppImage</b></summary>
+
+1. Download `Sachiva_<version>_amd64.AppImage`.
+2. Make it runnable: `chmod +x Sachiva_*_amd64.AppImage`
+3. Run it: `./Sachiva_*_amd64.AppImage`
+
+It needs FUSE 2 (`libfuse2` on Debian and Ubuntu, `fuse2` on Arch).
+</details>
+
+<details>
+<summary><b>Arch Linux package</b></summary>
+
+1. Download `sachiva-<version>-1-x86_64.pkg.tar.zst`.
+2. Install it: `sudo pacman -U sachiva-*-x86_64.pkg.tar.zst`
+3. Open Sachiva from the app menu.
+
+Updates install through pacman too: Sachiva asks for your password through the system prompt.
+To remove it: `sudo pacman -R sachiva`. Your data stays in `~/.local/share/dev.sachiva.sachiva`.
+</details>
+
+<details>
+<summary><b>Android</b></summary>
+
+1. On the phone, download `Sachiva_<version>_aarch64.apk`.
+2. Open it. Android asks to allow installing from your browser or file app: allow it for this once.
+3. Open Sachiva. Allow notifications, exact alarms and unrestricted battery use when asked.
+</details>
+
+<details>
+<summary><b>Check a download (optional)</b></summary>
+
+Each release has `SHA256SUMS.txt`. Compare its line for your file with:
+
+- Windows: `certutil -hashfile <file> SHA256`
+- Linux: `sha256sum <file>`
+
+If they differ, do not open the file. Download it again.
+</details>
 
 **First launch**
 
@@ -111,7 +181,23 @@ flowchart LR
 - The database is encrypted (SQLCipher). Its key is kept in your computer's password store, or in the
   phone's secure key store on Android.
 - A backup is made once a day; the last 14 are kept, encrypted with the same key.
-- Settings → **Your data** shows the backup folder and your recovery key.
+- Sachiva also backs up before every update and every restore.
+- Settings → **Your data** lists your backups. Press **Restore…** on one to see what it holds first; your
+  current data is backed up before it is replaced.
+- **Export a copy…** saves a file locked with a passphrase you choose, for moving to another device.
+  **Restore from a file…** opens it there.
+
+## ⬆️ Updates
+
+- At start, Sachiva checks for a new version (it sends nothing about you or your jobs). If there is one,
+  it shows what is new and asks. Nothing installs until you press **Install and restart**.
+- Before installing, it backs up your data. Every download is checked against Sachiva's signature, so a
+  damaged or altered file is refused.
+- Changed your mind? Settings → **Updates** → **Go back to** the version you had before. If that version
+  cannot read today's data, Sachiva tells you and uses the backup from before the update.
+- On Android, the phone itself asks you to confirm the update. Android cannot go back a version; the
+  backups from before each update stay available.
+- Turn checking off in Settings → **Updates**.
 
 > [!IMPORTANT]
 > The recovery key is the only way to open your data if the device's key store is reset. Nobody else has a
@@ -147,6 +233,20 @@ ahead, so open Sachiva at least every few days.
 
 Closing the window keeps Sachiva in the tray. **Quit** from the tray icon stops it. If you quit, start it
 again from the app menu.
+</details>
+
+<details>
+<summary>An update went wrong</summary>
+
+Open Settings → **Updates** → **Go back to** the previous version. Then tell us with **Report a problem**
+in Settings. It opens a GitHub form with the version and recent error messages filled in, and no job text.
+</details>
+
+<details>
+<summary>Windows says "Windows protected your PC"</summary>
+
+This warning appears for programs without a paid code-signing certificate. Choose **More info**, then
+**Run anyway**. To be sure the file is genuine, check it against `SHA256SUMS.txt` (see Get started).
 </details>
 
 <details>
@@ -189,8 +289,24 @@ Layout:
 | `app/src/` | The screens (Svelte) |
 | `plugins/device/` | Keeping the database key safe on each platform, Android alarm settings |
 | `app/harness/` | Fakes the app shell so screenshots run in a browser with demo data |
+| `packaging/` | The Arch package recipe and the portable version's read-me |
 
 Android and Windows builds run in GitHub Actions ([ci.yml](.github/workflows/ci.yml)).
+</details>
+
+<details>
+<summary>Making a release</summary>
+
+1. Set the same version in `app/src-tauri/tauri.conf.json`, `app/src-tauri/Cargo.toml` and
+   `app/package.json`, and add a `## [<version>]` section to `CHANGELOG.md`.
+2. Commit, tag `v<version>`, push the tag.
+3. [release.yml](.github/workflows/release.yml) runs all checks, then waits for the owner's approval
+   (the `release` environment holds the signing keys and accepts only `v*` tags).
+4. It builds every file into a **draft** release, signs them, writes `latest.json` and
+   `SHA256SUMS.txt`, and checks the signatures, the APK certificate and that the AppImage starts.
+5. The owner reads the draft and publishes it. Apps see the update once it is published.
+
+The Arch package is built from [packaging/arch/PKGBUILD](packaging/arch/PKGBUILD).
 </details>
 
 ## Licence

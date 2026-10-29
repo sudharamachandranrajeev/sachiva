@@ -3,6 +3,9 @@
 //! it running so reminders arrive with the window closed; on Android the
 //! next few days of reminders are handed to the system as exact alarms.
 
+mod data;
+mod update;
+
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -34,6 +37,8 @@ struct Inner {
     key_storage: Option<KeyStorage>,
     /// Why the store is not open, in plain words.
     problem: Option<String>,
+    /// Something to tell the user once, such as a failed restore at start.
+    notice: Option<String>,
 }
 
 struct App {
@@ -57,13 +62,24 @@ impl App {
     fn unlock(&self, app: &AppHandle) {
         let db = self.dir.join(DB_FILE);
         let first = !db.exists();
+        let staged = |k: &[u8; 32]| self.apply_staged_restore(k);
         let mut inner = self.inner.lock().unwrap();
-        match app.device().db_key(&self.dir, first) {
+        let key = app.device().db_key(&self.dir, first);
+        if let Ok(k) = &key {
+            inner.notice = staged(&k.key);
+        }
+        match key {
             Ok(k) => match Store::open(&db, &k.key) {
                 Ok(store) => {
-                    *inner = Inner { store: Some(store), key: Some(k.key), key_storage: Some(k.storage), problem: None }
+                    *inner = Inner {
+                        store: Some(store),
+                        key: Some(k.key),
+                        key_storage: Some(k.storage),
+                        problem: None,
+                        notice: inner.notice.take(),
+                    }
                 }
-                Err(e) => inner.problem = Some(format!("The saved key does not open your data ({e}).")),
+                Err(e) => inner.problem = Some(format!("Your data could not be opened: {e}")),
             },
             Err(e) => inner.problem = Some(format!("{e}.")),
         }
@@ -78,7 +94,7 @@ impl App {
         if store.get::<String>("maintenance.day").ok().flatten().as_deref() == Some(today.as_str()) {
             return;
         }
-        let _ = store.daily_backup(&self.dir.join("backups"), key, now, KEEP_BACKUPS);
+        let _ = store.daily_backup(&self.backup_dir(), key, now, KEEP_BACKUPS);
         drop(inner);
         let _ = self.with(|s| {
             s.purge(now, TRASH_DAYS)?;
@@ -96,11 +112,15 @@ struct StatusView {
     recovery_pending: bool,
     key_storage: Option<KeyStorage>,
     platform: &'static str,
+    notice: Option<String>,
+    /// The first-run steps after the recovery key are done or skipped.
+    setup_done: bool,
 }
 
 #[tauri::command]
 fn status(state: State<App>) -> StatusView {
-    let inner = state.inner.lock().unwrap();
+    let mut inner = state.inner.lock().unwrap();
+    let setup_done = inner.store.as_ref().and_then(|s| s.get::<bool>("setup.done").ok().flatten()).unwrap_or(false);
     let saved = inner.store.as_ref().and_then(|s| s.get::<bool>("recovery.saved").ok().flatten()).unwrap_or(false);
     StatusView {
         unlocked: inner.store.is_some(),
@@ -108,6 +128,43 @@ fn status(state: State<App>) -> StatusView {
         recovery_pending: inner.store.is_some() && !saved,
         key_storage: inner.key_storage,
         platform: std::env::consts::OS,
+        notice: inner.notice.take(),
+        setup_done,
+    }
+}
+
+#[tauri::command]
+fn setup_done(state: State<App>) -> CommandResult<()> {
+    state.with(|s| s.set("setup.done", &true))
+}
+
+/// Does Sachiva start with the computer? Always false on Android.
+#[tauri::command]
+fn autostart(app: AppHandle) -> bool {
+    #[cfg(desktop)]
+    {
+        use tauri_plugin_autostart::ManagerExt;
+        app.autolaunch().is_enabled().unwrap_or(false)
+    }
+    #[cfg(mobile)]
+    {
+        let _ = app;
+        false
+    }
+}
+
+#[tauri::command]
+fn set_autostart(app: AppHandle, on: bool) -> CommandResult<()> {
+    #[cfg(desktop)]
+    {
+        use tauri_plugin_autostart::ManagerExt;
+        let a = app.autolaunch();
+        if on { a.enable() } else { a.disable() }.map_err(err)
+    }
+    #[cfg(mobile)]
+    {
+        let _ = (app, on);
+        Ok(())
     }
 }
 
@@ -133,7 +190,7 @@ fn unlock_with(app: AppHandle, state: State<App>, recovery: String) -> CommandRe
         Store::open(&state.dir.join(DB_FILE), &key).map_err(|_| "That recovery key does not open this data.")?;
     let storage = app.device().set_db_key(&state.dir, &key).map_err(err)?;
     *state.inner.lock().map_err(err)? =
-        Inner { store: Some(store), key: Some(key), key_storage: Some(storage), problem: None };
+        Inner { store: Some(store), key: Some(key), key_storage: Some(storage), problem: None, notice: None };
     changed(&app);
     Ok(())
 }
@@ -259,38 +316,6 @@ fn set_settings(app: AppHandle, state: State<App>, settings: reminders::Settings
     state.with(|s| s.set("reminders.settings", &settings))?;
     changed(&app);
     Ok(())
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Backups {
-    folder: String,
-    files: Vec<String>,
-}
-
-#[tauri::command]
-fn backups(state: State<App>) -> CommandResult<Backups> {
-    let dir = state.dir.join("backups");
-    let mut files: Vec<String> = std::fs::read_dir(&dir)
-        .map(|r| r.filter_map(|e| e.ok()?.file_name().into_string().ok()).filter(|n| n.ends_with(".db")).collect())
-        .unwrap_or_default();
-    files.sort();
-    files.reverse();
-    Ok(Backups { folder: dir.display().to_string(), files })
-}
-
-/// Back up now, whether or not today's backup exists.
-#[tauri::command]
-fn backup_now(state: State<App>) -> CommandResult<String> {
-    let inner = state.inner.lock().map_err(err)?;
-    let (Some(store), Some(key)) = (inner.store.as_ref(), inner.key.as_ref()) else {
-        return Err("Sachiva is locked.".into());
-    };
-    let dir = state.dir.join("backups");
-    std::fs::create_dir_all(&dir).map_err(err)?;
-    let name = format!("sachiva-{}-manual.db", Timestamp::now().strftime("%Y-%m-%d-%H%M%S"));
-    store.export(&dir.join(&name), key).map_err(err)?;
-    Ok(name)
 }
 
 #[tauri::command]
@@ -463,15 +488,27 @@ fn show(app: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // For scripts and release checks: answers without opening a window.
+    if std::env::args().any(|a| a == "--version") {
+        println!("Sachiva {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
     let mut builder = tauri::Builder::default();
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show(app))).plugin(
-            tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])),
-        );
+        builder = builder
+            .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show(app)))
+            .plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                Some(vec!["--hidden"]),
+            ))
+            .plugin(tauri_plugin_updater::Builder::new().build());
     }
     builder
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sachiva_device::init())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
@@ -484,7 +521,7 @@ pub fn run() {
             }
             let tz = TimeZone::try_system().unwrap_or(TimeZone::UTC);
             app.manage(App {
-                inner: Mutex::new(Inner { store: None, key: None, key_storage: None, problem: None }),
+                inner: Mutex::new(Inner { store: None, key: None, key_storage: None, problem: None, notice: None }),
                 dir,
                 tz,
             });
@@ -545,8 +582,22 @@ pub fn run() {
             check_text,
             get_settings,
             set_settings,
-            backups,
-            backup_now,
+            setup_done,
+            autostart,
+            set_autostart,
+            data::backups,
+            data::backup_now,
+            data::export_backup,
+            data::pick_backup,
+            data::inspect_backup,
+            data::restore_backup,
+            update::update_status,
+            update::set_update_mode,
+            update::check_update,
+            update::install_update,
+            update::rollback_plan,
+            update::rollback,
+            update::open_page,
             alarm_access,
             open_alarm_settings,
             open_battery_settings,

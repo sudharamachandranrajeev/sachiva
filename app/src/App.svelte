@@ -9,6 +9,9 @@
   import Editor from './lib/Editor.svelte'
   import Lock from './lib/Lock.svelte'
   import Settings from './lib/Settings.svelte'
+  import Setup from './lib/Setup.svelte'
+  import UpdateBanner from './lib/UpdateBanner.svelte'
+  import { updates } from './lib/updates.svelte'
   import Tasks from './lib/Tasks.svelte'
 
   let now = $state(new Date())
@@ -33,11 +36,21 @@
 
   $effect(() => prefs.apply())
 
+  // Check for an update once per run, when the app is open and set up.
+  let checkedUpdates = false
+  $effect(() => {
+    const st = app.status
+    if (checkedUpdates || !st?.unlocked || st.recoveryPending || !st.setupDone) return
+    checkedUpdates = true
+    updates.startup()
+  })
+
   onMount(() => {
     let unlisten: (() => void) | undefined
     ;(async () => {
       try {
         await app.loadStatus()
+        if (app.status?.notice) app.say(app.status.notice, { error: true })
         await app.refresh()
         await checkAlarms()
         unlisten = await onChanged(() => app.refresh())
@@ -95,6 +108,8 @@
   <Lock mode="locked" />
 {:else if app.status.recoveryPending}
   <Lock mode="firstRun" />
+{:else if !app.status.setupDone}
+  <Setup {alarms} onAlarms={checkAlarms} />
 {:else}
   <div class="shell">
     <nav class="rail" aria-label="Main">
@@ -110,6 +125,7 @@
     </nav>
 
     <main>
+      <UpdateBanner />
       {#key app.view}
         <div in:fly={{ y: 6, duration: prefs.ms(200) }}>
           {#if app.view === 'dashboard'}

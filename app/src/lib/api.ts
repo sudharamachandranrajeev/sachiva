@@ -93,6 +93,9 @@ export interface AppStatus {
   recoveryPending: boolean
   keyStorage: KeyStorage | null
   platform: string
+  /** Something to tell the user once, such as a failed restore at start. */
+  notice: string | null
+  setupDone: boolean
 }
 
 export interface AlarmAccess {
@@ -100,10 +103,53 @@ export interface AlarmAccess {
   batteryUnrestricted: boolean
 }
 
+export type BackupKind = 'daily' | 'manual' | 'preUpdate' | 'beforeRestore'
+
+export interface Backup {
+  name: string
+  kind: BackupKind
+  bytes: number
+}
+
 export interface Backups {
   folder: string
-  files: string[]
+  files: Backup[]
 }
+
+export interface BackupSummary {
+  schema: number
+  openJobs: number
+  doneJobs: number
+  trashed: number
+  lastChange: string | null
+}
+
+export type InstallKind = 'installer' | 'appImage' | 'pacman' | 'portable' | 'android' | 'other'
+export type UpdateMode = 'ask' | 'off'
+
+export interface UpdateStatus {
+  kind: InstallKind
+  canInstall: boolean
+  current: string
+  previous: string | null
+  mode: UpdateMode
+}
+
+export interface UpdateInfo {
+  version: string
+  notes: string | null
+  date: string | null
+  canInstall: boolean
+}
+
+export interface RollbackPlan {
+  version: string
+  backup: string | null
+  needsRestore: boolean
+}
+
+export type Page = 'releases' | 'bug' | 'idea'
+
 
 export const api = {
   status: () => invoke<AppStatus>('status'),
@@ -124,11 +170,35 @@ export const api = {
   check: (text: string) => invoke<Finding[]>('check_text', { text }),
   settings: () => invoke<ReminderSettings>('get_settings'),
   setSettings: (settings: ReminderSettings) => invoke<void>('set_settings', { settings }),
+  setupDone: () => invoke<void>('setup_done'),
+  autostart: () => invoke<boolean>('autostart'),
+  setAutostart: (on: boolean) => invoke<void>('set_autostart', { on }),
   backups: () => invoke<Backups>('backups'),
   backupNow: () => invoke<string>('backup_now'),
+  /** False when the user cancelled the save dialog. */
+  exportBackup: (passphrase: string) => invoke<boolean>('export_backup', { passphrase }),
+  /** The picked file's name, or null when cancelled. */
+  pickBackup: () => invoke<string | null>('pick_backup'),
+  /** `name`: a backup in the folder; without it, the picked file with `passphrase`. */
+  inspectBackup: (name: string | null, passphrase: string | null) =>
+    invoke<BackupSummary>('inspect_backup', { name, passphrase }),
+  restoreBackup: (name: string | null, passphrase: string | null) =>
+    invoke<string>('restore_backup', { name, passphrase }),
+  updateStatus: () => invoke<UpdateStatus>('update_status'),
+  setUpdateMode: (mode: UpdateMode) => invoke<void>('set_update_mode', { mode }),
+  checkUpdate: () => invoke<UpdateInfo | null>('check_update'),
+  installUpdate: (version: string) => invoke<void>('install_update', { version }),
+  rollbackPlan: () => invoke<RollbackPlan | null>('rollback_plan'),
+  rollback: (restore: boolean) => invoke<void>('rollback', { restore }),
+  openPage: (page: Page, fields: Record<string, string> = {}) => invoke<void>('open_page', { page, fields }),
   alarmAccess: () => invoke<AlarmAccess>('alarm_access'),
   openAlarmSettings: () => invoke<void>('open_alarm_settings'),
   openBatterySettings: () => invoke<void>('open_battery_settings'),
+}
+
+/** Download progress of an update: bytes so far and the total, if known. */
+export function onUpdateProgress(f: (done: number, total: number | null) => void): Promise<UnlistenFn> {
+  return listen<[number, number | null]>('update-progress', (e) => f(e.payload[0], e.payload[1]))
 }
 
 /** Calls `f` whenever the data changes on the Rust side. */

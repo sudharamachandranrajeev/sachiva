@@ -1,0 +1,46 @@
+name: Report a problem
+description: Something does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. **Do not include patient details, names or anything that could identify a person.**
+        Sachiva filled in the details below; check them and remove anything you do not want to share.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen again
+      placeholder: "1. Open Settings\n2. Press ...\n3. ..."
+  - type: input
+    id: version
+    attributes:
+      label: Sachiva version
+  - type: input
+    id: os
+    attributes:
+      label: System
+  - type: input
+    id: install
+    attributes:
+      label: How Sachiva was installed
+  - type: input
+    id: theme
+    attributes:
+      label: Colours
+  - type: input
+    id: motion
+    attributes:
+      label: Movement
+  - type: textarea
+    id: errors
+    attributes:
+      label: Last error messages
+      render: text
