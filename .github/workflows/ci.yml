@@ -89,6 +89,11 @@ jobs:
         run: |
           "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.2.12479018"
           echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          # SQLCipher's vendored OpenSSL looks for aarch64-linux-android-ranlib,
+          # which the NDK no longer ships; point it at the LLVM tools.
+          bin="$ANDROID_SDK_ROOT/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "AR_aarch64_linux_android=$bin/llvm-ar" >> "$GITHUB_ENV"
+          echo "RANLIB_aarch64_linux_android=$bin/llvm-ranlib" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
