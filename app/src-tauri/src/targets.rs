@@ -153,10 +153,10 @@ pub async fn export_report(app: AppHandle, state: State<'_, App>, req: Request, 
     let ext = format.extension();
     let name = format!("sachiva-{kind}-report-{}.{ext}", Timestamp::now().strftime("%Y-%m-%d"));
     let label = match format {
-        Format::Xlsx => "Excel workbook",
-        Format::Docx => "Word document",
-        Format::Pptx => "PowerPoint presentation",
-        Format::Pdf => "PDF document",
+        Format::Xlsx => "Spreadsheet (.xlsx)",
+        Format::Docx => "Document (.docx)",
+        Format::Pptx => "Slides (.pptx)",
+        Format::Pdf => "PDF (.pdf)",
     };
     let dialog = app.dialog().file().set_file_name(&name).add_filter(label, &[ext]);
     let Some(target) = tauri::async_runtime::spawn_blocking(move || dialog.blocking_save_file()).await.map_err(err)?

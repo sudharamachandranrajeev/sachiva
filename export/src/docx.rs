@@ -1,4 +1,4 @@
-//! Word: an A4 landscape report with real headings, the summary table,
+//! docx: an A4 landscape report with real headings, the summary table,
 //! each chart as a picture with alt text, each data table with a header
 //! row that repeats across pages, and the footnote.
 

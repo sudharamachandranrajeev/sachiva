@@ -1,4 +1,4 @@
-//! Turns a Sachiva report into a file: Excel, Word, PowerPoint or PDF.
+//! Turns a Sachiva report into a file: a spreadsheet (.xlsx), document (.docx), slides (.pptx) or PDF.
 //! Every format draws from the same `Report`, so they always agree. Files
 //! are built in memory; the app writes them where the user chose.
 
@@ -16,11 +16,11 @@ use serde::Deserialize;
 pub enum Error {
     #[error("could not draw a chart: {0}")]
     Chart(String),
-    #[error("could not make the Excel file: {0}")]
+    #[error("could not make the xlsx file: {0}")]
     Xlsx(#[from] rust_xlsxwriter::XlsxError),
-    #[error("could not make the Word file: {0}")]
+    #[error("could not make the docx file: {0}")]
     Docx(String),
-    #[error("could not make the PowerPoint file: {0}")]
+    #[error("could not make the pptx file: {0}")]
     Pptx(String),
     #[error("could not make the PDF: {0}")]
     Pdf(String),
@@ -86,7 +86,7 @@ pub(crate) fn cell_text(c: &Cell) -> String {
     }
 }
 
-/// The summary table as text rows, shared by Word, PowerPoint, PDF and
+/// The summary table as text rows, shared by docx, pptx, PDF and
 /// the on-screen preview.
 pub const SUMMARY_COLUMNS: [&str; 6] = ["Measure", "Latest", "Target", "Variation", "Assurance", "Target met"];
 

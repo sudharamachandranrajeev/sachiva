@@ -1,5 +1,5 @@
-//! Excel: a Summary sheet, then one sheet per section with its table, the
-//! numbers behind each chart, and native Excel charts drawn from them, so
+//! xlsx: a Summary sheet, then one sheet per section with its table, the
+//! numbers behind each chart, and native spreadsheet charts drawn from them, so
 //! the workbook can be checked and reused. Blank figures stay empty cells
 //! and show as gaps in the charts.
 
@@ -33,7 +33,7 @@ fn fill(colour: &str) -> Format {
     base().set_background_color(hex(colour)).set_font_color(hex(text)).set_border(FormatBorder::Thin).set_text_wrap()
 }
 
-/// Excel sheet names: at most 31 characters, none of []:*?/\ and unique.
+/// Spreadsheet sheet names: at most 31 characters, none of []:*?/\ and unique.
 fn sheet_name(i: usize, title: &str) -> String {
     let clean: String =
         title.chars().map(|c| if "[]:*?/\\'".contains(c) || c.is_control() { ' ' } else { c }).collect();

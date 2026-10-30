@@ -1,5 +1,5 @@
 //! Draws report charts as SVG: one drawing for every format. PDF embeds it
-//! as vector graphics; Word and PowerPoint get a PNG made from it.
+//! as vector graphics; docx and pptx get a PNG made from it.
 //!
 //! Run charts use the Making Data Count colours: grey for no significant
 //! change, blue for improvement, orange for concern, purple for change on

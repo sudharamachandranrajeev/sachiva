@@ -44,7 +44,7 @@ warns you if something you type looks like a health number, phone number, birth 
 - 📋 **Waiting lists** – enter each list's figures daily, weekly or monthly: how many wait, joined, left and
   were booked, how long they wait (in bands), and the longest wait. Split by site, clinic and provider.
 - 📊 **Reports** – charts in the "Making Data Count" style used across health services, which show real
-  change apart from ordinary ups and downs. Save them as Excel, Word, PowerPoint or PDF.
+  change apart from ordinary ups and downs. Save them as a spreadsheet (.xlsx), document (.docx), slides (.pptx) or PDF.
 - 🛡️ **Confidentiality check** – warns, before you keep a job, if the text may identify a person.
 - ↩️ **Undo and trash** – undo any change; deleted jobs stay restorable for 30 days.
 - 🔒 **Encrypted and offline** – your data stays on your device in an encrypted database, with a daily backup.
@@ -214,7 +214,7 @@ flowchart LR
 **Make a report**
 
 1. Open **Reports**. Choose **My counts** or **Waiting lists**, how long each point is, and the dates.
-2. Press **Show report** to see it, or **Excel**, **Word**, **PowerPoint** or **PDF** to save a file.
+2. Press **Show report** to see it, or **Spreadsheet (.xlsx)**, **Document (.docx)**, **Slides (.pptx)** or **PDF (.pdf)** to save a file.
 
 How to read the charts:
 
@@ -340,7 +340,7 @@ Layout:
 | Folder | What is in it |
 | --- | --- |
 | `core/` | The rules, in Rust: jobs, score, repeats, reminders, counts, waiting lists, control charts, checker, encrypted store, backups |
-| `export/` | Writes reports as Excel, Word, PowerPoint and PDF, and draws the charts |
+| `export/` | Writes reports as spreadsheet (.xlsx), document (.docx), slides (.pptx) and PDF, and draws the charts |
 | `app/src-tauri/` | The app shell: commands, tray, reminder timer, Android alarms |
 | `app/src/` | The screens (Svelte) |
 | `plugins/device/` | Keeping the database key safe on each platform, Android alarm settings |

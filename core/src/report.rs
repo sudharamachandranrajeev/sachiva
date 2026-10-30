@@ -1,5 +1,5 @@
 //! Reports: one model, built here, that the screen and every export format
-//! (Excel, Word, PowerPoint, PDF) draw from, so they always agree.
+//! (xlsx, docx, pptx, PDF) draw from, so they always agree.
 
 use std::collections::BTreeMap;
 

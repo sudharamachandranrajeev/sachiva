@@ -1,5 +1,5 @@
-//! Small helpers for the hand-written Office Open XML packages (Word and
-//! PowerPoint): XML escaping, the zip container and document properties.
+//! Small helpers for the hand-written Office Open XML packages (docx and
+//! pptx): XML escaping, the zip container and document properties.
 //! Writing the XML ourselves lets every picture carry its alt text and
 //! every heading and table header be marked as such.
 

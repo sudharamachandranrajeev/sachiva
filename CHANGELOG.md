@@ -14,7 +14,7 @@ Targets, waiting lists and reports:
   Blank means not entered, never 0. Lists are archived, never deleted.
 - Reports: personal performance and waiting lists, as control charts in the "Making Data Count"
   style (process limits, special-cause colours, assurance against a target). Preview on screen; save
-  as Excel, Word, PowerPoint or PDF (tagged PDF/UA-1, alt text on every chart, no logos).
+  as a spreadsheet (.xlsx), document (.docx), slides (.pptx) or PDF (tagged PDF/UA-1, alt text on every chart, no logos).
 - The period still running is left out of performance charts and shown as "so far" in the table.
 
 ## [0.1.0]

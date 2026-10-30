@@ -1,4 +1,4 @@
-//! PowerPoint: a 16:9 deck with a title slide, the summary table, one
+//! pptx: a 16:9 deck with a title slide, the summary table, one
 //! chart per slide (alt text on the picture, and the same words shown
 //! as a caption so the audience gets the numbers too), and a closing
 //! slide with the footnote. Every slide has a real title placeholder.

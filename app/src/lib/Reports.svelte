@@ -64,17 +64,17 @@
   }
 
   const formats: [ExportFormat, string][] = [
-    ['xlsx', 'Excel'],
-    ['docx', 'Word'],
-    ['pptx', 'PowerPoint'],
-    ['pdf', 'PDF'],
+    ['xlsx', 'Spreadsheet (.xlsx)'],
+    ['docx', 'Document (.docx)'],
+    ['pptx', 'Slides (.pptx)'],
+    ['pdf', 'PDF (.pdf)'],
   ]
 
   async function save(format: ExportFormat, name: string) {
     if (!ready()) return
     busy = format
     try {
-      if (await api.exportReport(request(), format)) app.say(`Saved the ${name} report.`)
+      if (await api.exportReport(request(), format)) app.say(`Saved the report: ${name}.`)
     } catch (e) {
       error = message(e)
     } finally {
