@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0]
+
+Targets, tallies, waiting lists and reports (alpha). Updating keeps your jobs; Sachiva backs up first.
 
 Targets, waiting lists and reports:
 
