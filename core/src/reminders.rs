@@ -12,7 +12,8 @@ use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use serde::{Deserialize, Serialize};
 
-use crate::model::{Status, Task};
+use crate::counts::{self, Count};
+use crate::model::{Kind as TaskKind, Status, Task};
 use crate::priority::Priority;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -54,6 +55,8 @@ pub enum Kind {
     Overdue,
     Chase,
     Snoozed,
+    /// A target is behind its even pace late in its period.
+    Behind,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -139,6 +142,66 @@ pub fn next(task: &Task, prio: &Priority, now: Timestamp, days: i64, s: &Setting
     between(task, prio, now, now + SignedDuration::from_hours(24 * days), s, tz).into_iter().next()
 }
 
+/// A repeating target that is behind: one nudge when two-thirds of the
+/// period has gone, then at the start of each working day until it ends.
+/// Whether it is behind is judged with the counts known now.
+pub fn pace(
+    task: &Task,
+    task_counts: &[Count],
+    from: Timestamp,
+    to: Timestamp,
+    s: &Settings,
+    tz: &TimeZone,
+) -> Vec<Reminder> {
+    let TaskKind::Target { every: Some(span), .. } = task.kind else { return Vec::new() };
+    if to <= from {
+        return Vec::new();
+    }
+    let quiet_until = task.updated_at + SignedDuration::from_mins(s.quiet_after_edit_min);
+    let floor = task.snoozed_until.map_or(quiet_until, |z| z.max(quiet_until));
+    let mut out = Vec::new();
+    // Periods that overlap the window (a window is at most a few days).
+    let mut start = counts::period_start(span, counts::local_day(from, tz));
+    while counts::instant(start, tz) <= to {
+        let next = counts::next_start(span, start);
+        let (a, b) = (counts::instant(start, tz), counts::instant(next, tz));
+        let mut moments = vec![a + SignedDuration::from_secs((b.as_second() - a.as_second()) * 2 / 3)];
+        let mut day = counts::local_day(moments[0], tz);
+        while let Ok(m) = day.to_datetime(s.work_start).to_zoned(tz.clone()).map(|z| z.timestamp()) {
+            if m >= b {
+                break;
+            }
+            if m > moments[0] && in_hours(m, s, tz) {
+                moments.push(m);
+            }
+            day = day.tomorrow().unwrap_or(day);
+            if day >= next {
+                break;
+            }
+        }
+        for m in moments.into_iter().filter(|m| *m > from && *m <= to && *m >= floor && in_hours(*m, s, tz)) {
+            if let Some(p) = counts::progress(task, task_counts, m, tz)
+                && p.behind
+            {
+                let body = format!("{}. At an even pace it would be {} by now.", p.line, p.expected.unwrap_or(0));
+                out.push(Reminder {
+                    task_id: task.id.clone(),
+                    at: m,
+                    kind: Kind::Behind,
+                    urgent: false,
+                    title: format!("Behind on: {}", task.title),
+                    body,
+                });
+            }
+        }
+        if next <= start {
+            break;
+        }
+        start = next;
+    }
+    out
+}
+
 fn make(task: &Task, prio: &Priority, at: Timestamp, kind: Kind, urgent: bool) -> Reminder {
     let title = match kind {
         Kind::HeadsUp => format!("Coming up: {}", task.title),
@@ -146,6 +209,7 @@ fn make(task: &Task, prio: &Priority, at: Timestamp, kind: Kind, urgent: bool) -
         Kind::Overdue => format!("Overdue: {}", task.title),
         Kind::Chase => format!("Time to chase: {}", task.title),
         Kind::Snoozed => format!("Back from snooze: {}", task.title),
+        Kind::Behind => format!("Behind on: {}", task.title),
     };
     Reminder { task_id: task.id.clone(), at, kind, urgent, title, body: prio.why() }
 }
@@ -249,5 +313,23 @@ mod tests {
             between(&t, &p, at("2026-11-04T09:00:00Z"), at("2026-11-10T09:00:00Z"), &Settings::default(), &london())
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn behind_target_nudges_late_in_the_week() {
+        use crate::model::Span;
+        let tz = TimeZone::get("Europe/London").unwrap();
+        let mut t = Task::new("Bookings", at("2026-10-01T09:00:00Z"));
+        t.kind = TaskKind::Target { goal: 30, unit: "bookings".into(), every: Some(Span::Week) };
+        let s = Settings::default();
+        // Week of Mon 2 Nov: two-thirds is Fri 6 Nov 16:00; then Sat/Sun are off.
+        let r = pace(&t, &[], at("2026-11-02T00:00:00Z"), at("2026-11-09T00:00:00Z"), &s, &tz);
+        assert_eq!(r.len(), 1, "{r:?}");
+        assert_eq!(r[0].at, at("2026-11-06T16:00:00Z"));
+        assert_eq!(r[0].kind, Kind::Behind);
+        // On track: no nudge.
+        let done =
+            [Count { id: 1, task_id: t.id.clone(), at: at("2026-11-03T10:00:00Z"), delta: 25, note: String::new() }];
+        assert!(pace(&t, &done, at("2026-11-02T00:00:00Z"), at("2026-11-09T00:00:00Z"), &s, &tz).is_empty());
     }
 }

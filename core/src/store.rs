@@ -12,8 +12,10 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::model::Task;
+use crate::counts::{self, Count};
+use crate::model::{Kind, Span, Task};
 use crate::recur;
+use crate::waitlist::{Figures, WaitList};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -29,6 +31,9 @@ pub enum Error {
     NotFound(String),
     #[error("this database was made by a newer Sachiva (schema {0}); update the app")]
     TooNew(i64),
+    /// A change the rules do not allow; the text is for the user.
+    #[error("{0}")]
+    Invalid(String),
 }
 
 /// What locks a database: the device key (raw, no key derivation), or a
@@ -65,7 +70,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Schema steps; index + 1 is the version they lead to. Never edit a step
 /// that has shipped: add a new one.
-const MIGRATIONS: &[&str] = &["
+const MIGRATIONS: &[&str] = &[
+    "
     CREATE TABLE tasks (
         id TEXT PRIMARY KEY,
         json TEXT NOT NULL,
@@ -83,7 +89,29 @@ const MIGRATIONS: &[&str] = &["
         at INTEGER NOT NULL
     );
     CREATE TABLE kv (key TEXT PRIMARY KEY, json TEXT NOT NULL);
-"];
+",
+    "
+    CREATE TABLE counts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        delta INTEGER NOT NULL,
+        note TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX counts_task_at ON counts(task_id, at);
+    CREATE INDEX counts_at ON counts(at);
+    CREATE TABLE waitlists (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+    CREATE TABLE figures (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        list_id TEXT NOT NULL,
+        span TEXT NOT NULL,
+        start TEXT NOT NULL,
+        json TEXT NOT NULL,
+        saved_at INTEGER NOT NULL
+    );
+    CREATE INDEX figures_period ON figures(list_id, span, start, seq);
+",
+];
 
 pub struct Store {
     conn: Connection,
@@ -255,6 +283,11 @@ impl Store {
     pub fn purge(&mut self, now: Timestamp, keep_days: i64) -> Result<usize> {
         let cut = (now - SignedDuration::from_hours(24 * keep_days)).as_second();
         let tx = self.conn.transaction()?;
+        // Counts go with their task once it leaves the trash for good.
+        tx.execute(
+            "DELETE FROM counts WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)",
+            [cut],
+        )?;
         let n = tx.execute("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?", [cut])?;
         tx.execute("DELETE FROM history WHERE at < ?", [cut])?;
         tx.commit()?;
@@ -326,6 +359,108 @@ impl Store {
         std::fs::rename(&tmp, &path)?;
         prune(dir, PRE_UPDATE, keep)?;
         Ok(path)
+    }
+
+    /// Add (or, with a negative `delta`, take away) on a target or tally.
+    /// Entries are never edited or deleted; a correction is a new entry.
+    pub fn add_count(&mut self, task_id: &str, delta: i64, note: &str, now: Timestamp) -> Result<Count> {
+        let task = self.task(task_id)?;
+        if !matches!(task.kind, Kind::Target { .. } | Kind::Tally { .. }) {
+            return Err(Error::Invalid("Only targets and tallies keep counts.".into()));
+        }
+        let tx = self.conn.transaction()?;
+        let total: i64 =
+            tx.query_row("SELECT coalesce(sum(delta), 0) FROM counts WHERE task_id = ?", [task_id], |r| r.get(0))?;
+        counts::check_entry(delta, note, total).map_err(Error::Invalid)?;
+        tx.execute(
+            "INSERT INTO counts (task_id, at, delta, note) VALUES (?, ?, ?, ?)",
+            params![task_id, now.as_second(), delta, note.trim()],
+        )?;
+        let id = tx.last_insert_rowid();
+        tx.commit()?;
+        Ok(Count { id, task_id: task_id.into(), at: now, delta, note: note.trim().into() })
+    }
+
+    /// Counts with `at >= since`, all tasks, oldest first.
+    pub fn counts_since(&self, since: Timestamp) -> Result<Vec<Count>> {
+        let mut st =
+            self.conn.prepare("SELECT id, task_id, at, delta, note FROM counts WHERE at >= ? ORDER BY at, id")?;
+        let rows = st.query_map([since.as_second()], |r| {
+            Ok(Count { id: r.get(0)?, task_id: r.get(1)?, at: ts(r.get(2)?), delta: r.get(3)?, note: r.get(4)? })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Every count of one task, oldest first.
+    pub fn counts_of(&self, task_id: &str) -> Result<Vec<Count>> {
+        let mut st =
+            self.conn.prepare("SELECT id, task_id, at, delta, note FROM counts WHERE task_id = ? ORDER BY at, id")?;
+        let rows = st.query_map([task_id], |r| {
+            Ok(Count { id: r.get(0)?, task_id: r.get(1)?, at: ts(r.get(2)?), delta: r.get(3)?, note: r.get(4)? })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn waitlists(&self) -> Result<Vec<WaitList>> {
+        let mut st = self.conn.prepare("SELECT json FROM waitlists ORDER BY id")?;
+        let rows = st.query_map([], |r| r.get::<_, String>(0))?;
+        rows.map(|j| Ok(serde_json::from_str(&j?)?)).collect()
+    }
+
+    pub fn waitlist(&self, id: &str) -> Result<WaitList> {
+        let j: Option<String> =
+            self.conn.query_row("SELECT json FROM waitlists WHERE id = ?", [id], |r| r.get(0)).optional()?;
+        Ok(serde_json::from_str(&j.ok_or_else(|| Error::NotFound(id.into()))?)?)
+    }
+
+    /// Create or update a list. Lists are archived, never deleted, because
+    /// their figures stay in reports. Changing the number of bands is
+    /// refused once figures exist, so old figures keep their meaning.
+    pub fn save_waitlist(&mut self, list: &WaitList, now: Timestamp) -> Result<()> {
+        list.validate().map_err(Error::Invalid)?;
+        if let Ok(old) = self.waitlist(&list.id)
+            && old.bands != list.bands
+        {
+            let used: i64 =
+                self.conn.query_row("SELECT count(*) FROM figures WHERE list_id = ?", [&list.id], |r| r.get(0))?;
+            if used > 0 {
+                return Err(Error::Invalid(
+                    "This list already has figures, so its bands cannot change. Make a new list for the new bands."
+                        .into(),
+                ));
+            }
+        }
+        self.conn.execute(
+            "INSERT INTO waitlists (id, json, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(id) DO UPDATE SET json = ?2, updated_at = ?3",
+            params![list.id, serde_json::to_string(list)?, now.as_second()],
+        )?;
+        Ok(())
+    }
+
+    /// Save figures for a period. Earlier saves for the same period are kept.
+    pub fn save_figures(&mut self, f: &Figures, now: Timestamp) -> Result<()> {
+        let list = self.waitlist(&f.list_id)?;
+        f.validate(&list).map_err(Error::Invalid)?;
+        self.conn.execute(
+            "INSERT INTO figures (list_id, span, start, json, saved_at) VALUES (?, ?, ?, ?, ?)",
+            params![f.list_id, span_key(f.span), f.start.to_string(), serde_json::to_string(f)?, now.as_second()],
+        )?;
+        Ok(())
+    }
+
+    /// The newest figures for each list and period of `span` from `from`
+    /// to `to` (period starts, inclusive), ordered by list then period.
+    pub fn figures(&self, span: Span, from: jiff::civil::Date, to: jiff::civil::Date) -> Result<Vec<Figures>> {
+        let mut st = self.conn.prepare(
+            "SELECT f.json FROM figures f
+             JOIN (SELECT max(seq) AS seq FROM figures WHERE span = ?1 AND start >= ?2 AND start <= ?3
+                   GROUP BY list_id, start) m ON m.seq = f.seq
+             ORDER BY f.list_id, f.start",
+        )?;
+        let rows =
+            st.query_map(params![span_key(span), from.to_string(), to.to_string()], |r| r.get::<_, String>(0))?;
+        rows.map(|j| Ok(serde_json::from_str(&j?)?)).collect()
     }
 
     /// Run one change in a transaction; all its rows share one undo group.
@@ -463,6 +598,14 @@ fn key_literal(key: &[u8; 32]) -> String {
     format!("x'{hex}'")
 }
 
+fn span_key(s: Span) -> &'static str {
+    match s {
+        Span::Day => "day",
+        Span::Week => "week",
+        Span::Month => "month",
+    }
+}
+
 fn ts(s: i64) -> Timestamp {
     Timestamp::from_second(s).unwrap_or(Timestamp::UNIX_EPOCH)
 }
@@ -491,6 +634,55 @@ mod tests {
         s.undo().unwrap();
         assert!(s.tasks().unwrap().is_empty());
         assert!(s.undo().unwrap().is_none());
+    }
+
+    #[test]
+    fn counts_add_up_and_never_go_below_zero() {
+        let mut s = Store::memory().unwrap();
+        let now = at("2026-11-04T09:00:00Z");
+        let mut t = Task::new("Calls", now);
+        assert!(s.save(&t, now).is_ok());
+        assert!(matches!(s.add_count(&t.id, 1, "", now), Err(Error::Invalid(_))), "a plain job keeps no counts");
+        t.kind = Kind::Tally { unit: "calls".into() };
+        s.save(&t, now).unwrap();
+        s.add_count(&t.id, 3, "", now).unwrap();
+        s.add_count(&t.id, -1, "miscounted", at("2026-11-04T10:00:00Z")).unwrap();
+        assert!(matches!(s.add_count(&t.id, -5, "", now), Err(Error::Invalid(_))));
+        let all = s.counts_of(&t.id).unwrap();
+        assert_eq!(all.iter().map(|c| c.delta).sum::<i64>(), 2);
+        assert_eq!(all[1].note, "miscounted");
+        assert_eq!(s.counts_since(at("2026-11-04T09:30:00Z")).unwrap().len(), 1);
+        // Undo of task edits does not touch counts.
+        s.undo().unwrap();
+        assert_eq!(s.counts_of(&t.id).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn figures_keep_every_save_and_show_the_newest() {
+        use jiff::civil::date;
+        let mut s = Store::memory().unwrap();
+        let now = at("2026-11-04T09:00:00Z");
+        let mut l = WaitList::new("Clinic A");
+        s.save_waitlist(&l, now).unwrap();
+        let mut f = Figures::empty(&l.id, Span::Week, date(2026, 11, 2), 4);
+        f.total = Some(120);
+        s.save_figures(&f, now).unwrap();
+        f.total = Some(118);
+        s.save_figures(&f, now).unwrap();
+        let mut g = Figures::empty(&l.id, Span::Week, date(2026, 10, 26), 4);
+        g.total = Some(125);
+        s.save_figures(&g, now).unwrap();
+        let got = s.figures(Span::Week, date(2026, 10, 1), date(2026, 11, 30)).unwrap();
+        assert_eq!(got.iter().map(|f| f.total).collect::<Vec<_>>(), vec![Some(125), Some(118)]);
+        assert!(s.figures(Span::Month, date(2026, 10, 1), date(2026, 11, 30)).unwrap().is_empty());
+        let saves: i64 = s.conn.query_row("SELECT count(*) FROM figures", [], |r| r.get(0)).unwrap();
+        assert_eq!(saves, 3, "the first save is still there");
+        // Bands are fixed once figures exist.
+        l.bands = vec![6, 52];
+        assert!(matches!(s.save_waitlist(&l, now), Err(Error::Invalid(_))));
+        // Bad figures are refused.
+        f.start = date(2026, 11, 3);
+        assert!(matches!(s.save_figures(&f, now), Err(Error::Invalid(_))));
     }
 
     #[test]

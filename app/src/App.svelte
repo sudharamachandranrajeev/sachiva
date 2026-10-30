@@ -8,11 +8,13 @@
   import Dashboard from './lib/Dashboard.svelte'
   import Editor from './lib/Editor.svelte'
   import Lock from './lib/Lock.svelte'
+  import Reports from './lib/Reports.svelte'
   import Settings from './lib/Settings.svelte'
   import Setup from './lib/Setup.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
   import { updates } from './lib/updates.svelte'
   import Tasks from './lib/Tasks.svelte'
+  import WaitingLists from './lib/WaitingLists.svelte'
 
   let now = $state(new Date())
   let alarms = $state<AlarmAccess | null>(null)
@@ -21,11 +23,15 @@
   const nav: [View, string][] = [
     ['dashboard', 'Dashboard'],
     ['tasks', 'Tasks'],
+    ['lists', 'Waiting lists'],
+    ['reports', 'Reports'],
     ['settings', 'Settings'],
   ]
   const counts = $derived<Record<View, string>>({
     dashboard: '',
-    tasks: app.dash ? String(app.dash.items.length + (app.dash.now ? 1 : 0)) : '',
+    tasks: app.dash ? String(app.dash.items.length + (app.dash.now ? 1 : 0) + app.counters.length) : '',
+    lists: '',
+    reports: '',
     settings: '',
   })
 
@@ -132,6 +138,10 @@
             <Dashboard {now} {alarms} />
           {:else if app.view === 'tasks'}
             <Tasks />
+          {:else if app.view === 'lists'}
+            <WaitingLists />
+          {:else if app.view === 'reports'}
+            <Reports />
           {:else}
             <Settings {alarms} onAlarms={checkAlarms} />
           {/if}
@@ -141,7 +151,9 @@
 
     <nav class="dock card" aria-label="Main">
       {#each nav as [id, name] (id)}
-        <button class:sel={app.view === id} aria-current={app.view === id ? 'page' : undefined} onclick={() => (app.view = id)}>{name}</button>
+        <button class:sel={app.view === id} aria-current={app.view === id ? 'page' : undefined} onclick={() => (app.view = id)}
+          >{id === 'lists' ? 'Lists' : id === 'dashboard' ? 'Home' : name}</button
+        >
       {/each}
       <button class="fab" aria-label="Quick capture" onclick={() => (app.capturing = true)}>+</button>
     </nav>
@@ -296,7 +308,7 @@
     .dock button {
       font-size: 13px;
       color: var(--muted);
-      padding: 8px 12px;
+      padding: 8px 6px;
       border-radius: 14px;
     }
     .dock button.sel {

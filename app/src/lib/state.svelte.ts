@@ -1,8 +1,8 @@
 // What the whole UI shares: the dashboard, the open editor, the message bar.
 
-import { api, message, type AppStatus, type Dashboard, type Task } from './api'
+import { api, message, type AppStatus, type Counter, type Dashboard, type Task } from './api'
 
-export type View = 'dashboard' | 'tasks' | 'settings'
+export type View = 'dashboard' | 'tasks' | 'lists' | 'reports' | 'settings'
 
 interface Toast {
   text: string
@@ -13,6 +13,8 @@ interface Toast {
 class AppState {
   status = $state<AppStatus | null>(null)
   dash = $state<Dashboard | null>(null)
+  /** Open targets and tallies; the dashboard ranks only the other jobs. */
+  counters = $state<Counter[]>([])
   view = $state<View>('dashboard')
   editing = $state<{ task: Task; isNew: boolean } | null>(null)
   capturing = $state(false)
@@ -28,7 +30,7 @@ class AppState {
   async refresh() {
     if (!this.status?.unlocked) return
     try {
-      this.dash = await api.dashboard()
+      ;[this.dash, this.counters] = await Promise.all([api.dashboard(), api.counters()])
       this.version++
     } catch (e) {
       this.say(message(e), { error: true })

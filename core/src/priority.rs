@@ -34,9 +34,9 @@ impl Priority {
     }
 }
 
-/// `None` for finished tasks: they are not ranked.
+/// `None` for finished tasks and counters: they are not ranked.
 pub fn score(task: &Task, now: Timestamp) -> Option<Priority> {
-    if task.is_done() {
+    if task.is_done() || task.is_counter() {
         return None;
     }
     let mut reasons = Vec::new();

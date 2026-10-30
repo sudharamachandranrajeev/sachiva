@@ -1,5 +1,6 @@
-// Screenshot harness: fakes the Rust side with demo.json (from core/examples/demo.rs).
-// Synthetic data only. Hash options: view, edit, capture, theme, platform, mode
+// Screenshot harness: fakes the Rust side with demo.json (from export/examples/demo.rs).
+// Synthetic data only. Hash options: view, edit, capture, report (performance,
+// waiting; with view=reports), theme, platform, mode
 // (ok, locked, first, setup), update (an update is waiting), kind (install kind).
 import { mockIPC } from '@tauri-apps/api/mocks'
 import demo from './demo.json'
@@ -37,6 +38,11 @@ mockIPC((cmd, args: any) => {
         out.push({ kind: 'healthNumber', start: m.index, end: m.index! + m[0].length, text: m[0], message: 'This looks like an NHS or H&C number. Use your reference code instead.' })
       return out
     }
+    case 'counters': return demo.counters
+    case 'recent_counts': return []
+    case 'waitlists': return demo.waitlists
+    case 'get_figures': return { ...demo.figures, listId: args.listId }
+    case 'preview_report': return args.req.kind === 'waitingList' ? demo.waiting : demo.performance
     case 'new_task': return { ...demo.dashboard.items[0].task, id: crypto.randomUUID(), title: args.title }
     case 'plugin:app|version': return '0.1.0'
     case 'plugin:event|listen': return 1
@@ -54,3 +60,9 @@ if (p.get('edit')) {
   app.editing = { task: t as any, isNew: false }
 }
 if (p.get('capture')) app.capturing = true
+if (p.get('report')) {
+  await new Promise((r) => setTimeout(r, 300))
+  if (p.get('report') === 'waiting') (document.querySelector('input[value="waitingList"]') as HTMLInputElement)?.click()
+  await new Promise((r) => setTimeout(r, 100))
+  ;[...document.querySelectorAll('button')].find((b) => b.textContent === 'Show report')?.click()
+}

@@ -45,6 +45,8 @@
     const all: Item[] = app.dash ? [...(app.dash.now ? [app.dash.now] : []), ...app.dash.items] : []
     return all.filter((i) => (!lane || i.lane === lane) && matches(i.task))
   })
+  // Targets and tallies have no score, so they sit below the scored jobs.
+  const counters = $derived(lane ? [] : app.counters.filter((c) => matches(c.task)))
   const doneShown = $derived(done.filter(matches))
   const trashShown = $derived(trash.filter((t) => matches(t.task)))
   const filtered = $derived(words.length > 0 || !!lane || !!site || !!tag)
@@ -95,8 +97,16 @@
         <TaskRow task={i.task} score={i.score} why={i.why} overdue={i.overdue} />
       </div>
     {:else}
-      <p class="muted">{filtered ? 'No open jobs match.' : 'No open jobs. Add one with + New job.'}</p>
+      {#if !counters.length}
+        <p class="muted">{filtered ? 'No open jobs match.' : 'No open jobs. Add one with + New job.'}</p>
+      {/if}
     {/each}
+    {#if counters.length}
+      <h3 class="group">Targets and tallies</h3>
+      {#each counters as c (c.task.id)}
+        <TaskRow task={c.task} why={c.progress.line} />
+      {/each}
+    {/if}
   {:else if tab === 'done'}
     {#each doneShown as t (t.id)}
       <div class="row">
@@ -199,5 +209,10 @@
   .error {
     color: var(--urgent);
     margin-bottom: 10px;
+  }
+  .group {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 16px 4px 8px;
   }
 </style>

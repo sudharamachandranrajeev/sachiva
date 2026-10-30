@@ -4,6 +4,7 @@
 //! next few days of reminders are handed to the system as exact alarms.
 
 mod data;
+mod targets;
 mod update;
 
 use std::path::PathBuf;
@@ -344,10 +345,19 @@ fn changed(app: &AppHandle) {
 fn due_reminders(state: &App, from: Timestamp, to: Timestamp) -> Vec<Reminder> {
     let settings = state.settings();
     let Ok(tasks) = state.with(|s| s.tasks()) else { return Vec::new() };
-    sachiva_core::priority::rank(&tasks, to)
+    let mut due: Vec<Reminder> = sachiva_core::priority::rank(&tasks, to)
         .into_iter()
         .filter_map(|(t, p)| reminders::between(t, &p, from, to, &settings, &state.tz).pop())
-        .collect()
+        .collect();
+    // Targets are not ranked; behind-pace nudges come separately, the latest per target.
+    let mut pace = targets::pace_reminders(state, from, to, &settings);
+    pace.sort_by_key(|r| r.at);
+    for r in pace.into_iter().rev() {
+        if !due.iter().any(|d| d.task_id == r.task_id) {
+            due.push(r);
+        }
+    }
+    due
 }
 
 #[cfg(desktop)]
@@ -386,6 +396,7 @@ fn schedule_alarms(app: &AppHandle) {
             reminders::between(t, &p, now, now + SignedDuration::from_hours(24 * DAYS), &settings, &state.tz)
         })
         .collect();
+    all.extend(targets::pace_reminders(&state, now, now + SignedDuration::from_hours(24 * DAYS), &settings));
     all.sort_by_key(|r| r.at);
     all.truncate(MAX);
 
@@ -598,6 +609,16 @@ pub fn run() {
             update::rollback_plan,
             update::rollback,
             update::open_page,
+            targets::counters,
+            targets::add_count,
+            targets::recent_counts,
+            targets::waitlists,
+            targets::new_waitlist,
+            targets::save_waitlist,
+            targets::get_figures,
+            targets::save_figures,
+            targets::preview_report,
+            targets::export_report,
             alarm_access,
             open_alarm_settings,
             open_battery_settings,

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { api, message, type Finding, type Repeat, type Task, type Weekday } from './api'
+  import { api, message, type Finding, type Kind, type Repeat, type Span, type Task, type Weekday } from './api'
   import { app } from './state.svelte'
   import { fromInput, minutesToTomorrowMorning, toInput, when } from './time'
 
@@ -30,6 +30,29 @@
     ['sat', 'Sat'],
     ['sun', 'Sun'],
   ]
+
+  const kinds: [Kind['type'], string][] = [
+    ['generic', 'General job'],
+    ['deadline', 'Job with a deadline'],
+    ['target', 'Target: count towards a number'],
+    ['tally', 'Tally: count what you do'],
+    ['chase', 'Chase: waiting on someone'],
+    ['checklist', 'Recurring checklist'],
+    ['appointment', 'Appointment or call'],
+  ]
+
+  function setKind(type: Kind['type']) {
+    const unit = t.kind.type === 'target' || t.kind.type === 'tally' ? t.kind.unit : ''
+    if (type === 'target') t.kind = { type, goal: 10, unit, every: 'week' }
+    else if (type === 'tally') t.kind = { type, unit }
+    else t.kind = { type } as Kind
+    // Counters count per period themselves; they do not repeat.
+    if (type === 'target' || type === 'tally') t.repeat = null
+    if (type === 'chase' && t.status.state !== 'waiting') t.status = { state: 'waiting', on: '', chase: null }
+    if (type === 'checklist' && !t.repeat) t.repeat = { kind: 'weekly', every: 1, days: [] }
+  }
+
+  const counter = $derived(t.kind.type === 'tally' || (t.kind.type === 'target' && t.kind.every !== null))
 
   onMount(() => {
     dialog.showModal()
@@ -83,6 +106,8 @@
       ['Notes', t.notes],
       ['Site', t.site],
       ['Tags', tagText],
+      ['Activity', t.activity],
+      ...(t.kind.type === 'target' || t.kind.type === 'tally' ? [['Unit', t.kind.unit] as [string, string]] : []),
       ...t.checklist.map((c, i): [string, string] => [`Checklist item ${i + 1}`, c.text]),
     ]
     if (t.status.state === 'waiting') fields.push(['Waiting on', t.status.on])
@@ -183,6 +208,59 @@
         autofocus={isNew}
       />
     </label>
+
+    <div class="field-group">
+      <label class="field">
+        Type of job
+        <select value={t.kind.type} onchange={(e) => setKind(e.currentTarget.value as Kind['type'])}>
+          {#each kinds as [v, name] (v)}<option value={v}>{name}</option>{/each}
+        </select>
+      </label>
+      {#if t.kind.type === 'target'}
+        {@const k = t.kind}
+        <div class="inline">
+          <label class="inline">
+            Goal
+            <input
+              type="number"
+              min="1"
+              max="1000000"
+              bind:value={() => k.goal, (v) => (k.goal = whole(v, 1, 1_000_000))}
+            />
+          </label>
+          <input class="unit" bind:value={k.unit} maxlength="80" placeholder="e.g. calls" aria-label="Unit" />
+          <select
+            aria-label="How often"
+            value={k.every ?? 'once'}
+            onchange={(e) => {
+              const v = e.currentTarget.value
+              k.every = v === 'once' ? null : (v as Span)
+              if (k.every) t.repeat = null
+            }}
+          >
+            <option value="day">each day</option>
+            <option value="week">each week (Monday to Sunday)</option>
+            <option value="month">each month</option>
+            <option value="once">in total, by the due date</option>
+          </select>
+        </div>
+        {#if k.every === null && !t.due}<span class="muted small">Set a due date below for a one-off target.</span>{/if}
+      {:else if t.kind.type === 'tally'}
+        {@const k = t.kind}
+        <label class="inline">
+          Counting
+          <input class="unit" bind:value={k.unit} maxlength="80" placeholder="e.g. bookings" aria-label="Unit" />
+          from 0, with no goal.
+        </label>
+      {/if}
+      {#if t.kind.type === 'target' || t.kind.type === 'tally'}
+        <label class="field">
+          Activity, for the performance report
+          <input bind:value={t.activity} maxlength="80" placeholder="Leave blank to use the title, e.g. Calls" />
+        </label>
+        <span class="muted small">Add to the count from the dashboard. Jobs with the same activity are added up in the report.</span>
+      {/if}
+    </div>
 
     {#if findings.length}
       <div class="check" role="status">
@@ -311,6 +389,7 @@
       </div>
     </div>
 
+    {#if !counter}
     <div class="field-group">
       <span class="label">Repeat</span>
       <select value={t.repeat?.kind ?? 'none'} onchange={(e) => setRepeat(e.currentTarget.value)} aria-label="Repeat">
@@ -345,6 +424,7 @@
       {/if}
       {#if t.repeat}<span class="muted small">When you mark it done, the next one is made with the same times moved on.</span>{/if}
     </div>
+    {/if}
 
     <label class="field">
       Notes
@@ -496,6 +576,9 @@
   }
   .inline input {
     width: 80px;
+  }
+  .inline input.unit {
+    width: 160px;
   }
   .days {
     display: flex;

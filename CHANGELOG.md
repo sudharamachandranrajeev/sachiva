@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+Targets, waiting lists and reports:
+
+- Type of job: general, with a deadline, target, tally, chase, recurring checklist, appointment or call.
+- Targets per day, week or month, or a total by a date. Progress bar, even-pace marker, "Behind" flag,
+  "met in N of the last M", and a working-hours reminder when a repeating target falls behind.
+- Tallies count up from 0 with no goal. +1, +N and Undo last on the dashboard; corrections are new
+  entries, never edits.
+- Waiting lists with site, clinic, provider (initials or role), wait bands and a target wait. Enter
+  figures daily, weekly or monthly: total, added, removed, booked, each band and the longest wait.
+  Blank means not entered, never 0. Lists are archived, never deleted.
+- Reports: personal performance and waiting lists, as control charts in the "Making Data Count"
+  style (process limits, special-cause colours, assurance against a target). Preview on screen; save
+  as Excel, Word, PowerPoint or PDF (tagged PDF/UA-1, alt text on every chart, no logos).
+- The period still running is left out of performance charts and shown as "so far" in the table.
+
 ## [0.1.0]
 
 The first release (alpha). Installers for Windows, Linux and Android.

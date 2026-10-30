@@ -12,7 +12,7 @@ chrome=${CHROMIUM:-chromium}
 port=5199
 mkdir -p "$out"
 
-cargo run -q -p sachiva-core --example demo >app/harness/demo.json
+cargo run -q -p sachiva-export --example demo >app/harness/demo.json
 (cd app && exec npx vite --port $port --strictPort >/dev/null 2>&1) &
 vite=$!
 trap 'kill $vite 2>/dev/null || true' EXIT
@@ -36,4 +36,7 @@ shot setup 1280,760 "mode=setup"
 shot update 1280,860 "update=1"
 shot portable 1280,860 "update=1&kind=portable&platform=windows"
 shot settings 1280,2400 "view=settings"
+shot waiting-lists 1280,1100 "view=lists"
+shot report-waiting 1280,2600 "view=reports&report=waiting"
+shot report-performance 1280,1800 "view=reports&report=performance"
 rm -rf "$profile"

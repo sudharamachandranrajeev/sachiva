@@ -55,6 +55,39 @@ pub enum Repeat {
     AfterDone { days: u16 },
 }
 
+/// A day, a week (Monday to Sunday) or a calendar month, in local time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Span {
+    Day,
+    Week,
+    Month,
+}
+
+/// What sort of job this is. It decides which fields the editor shows and
+/// how the dashboard treats it; the other fields work the same for all.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum Kind {
+    #[default]
+    Generic,
+    Deadline,
+    /// Reach `goal` in every `every` period, or once by the due date when
+    /// `every` is `None`. Progress is the sum of its counts.
+    Target {
+        goal: u32,
+        unit: String,
+        every: Option<Span>,
+    },
+    /// Counts work done, from 0, with no goal.
+    Tally {
+        unit: String,
+    },
+    Chase,
+    Checklist,
+    Appointment,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckItem {
     pub text: String,
@@ -66,6 +99,12 @@ pub struct CheckItem {
 pub struct Task {
     pub id: String,
     pub title: String,
+    #[serde(default)]
+    pub kind: Kind,
+    /// What the counts are of, for reports: "Calls", "Bookings". Empty
+    /// means the title is used.
+    #[serde(default)]
+    pub activity: String,
     #[serde(default)]
     pub notes: String,
     /// When it must be done by.
@@ -99,6 +138,8 @@ impl Task {
         Task {
             id: uuid::Uuid::now_v7().to_string(),
             title: title.into(),
+            kind: Kind::Generic,
+            activity: String::new(),
             notes: String::new(),
             due: None,
             appointment: None,
@@ -120,6 +161,18 @@ impl Task {
         matches!(self.status, Status::Done { .. })
     }
 
+    /// Tallies and repeating targets run on and are never "done": the
+    /// dashboard shows them as counters, not in the ranked list.
+    pub fn is_counter(&self) -> bool {
+        matches!(self.kind, Kind::Tally { .. } | Kind::Target { every: Some(_), .. })
+    }
+
+    /// The name reports group counts under.
+    pub fn activity_name(&self) -> &str {
+        let a = self.activity.trim();
+        if a.is_empty() { self.title.trim() } else { a }
+    }
+
     /// The time that matters most: the appointment if earlier than the deadline.
     pub fn deadline(&self) -> Option<Timestamp> {
         match (self.due, self.appointment) {
@@ -133,6 +186,9 @@ impl Task {
 pub const MAX_TITLE: usize = 300;
 pub const MAX_NOTES: usize = 20_000;
 pub const MAX_ITEMS: usize = 200;
+/// Short names: activities, units, waiting lists.
+pub const MAX_NAME: usize = 80;
+pub const MAX_GOAL: u32 = 1_000_000;
 
 impl Task {
     /// Checks a task coming from the UI. Returns a message for the user.
@@ -152,6 +208,29 @@ impl Task {
         }
         if self.checklist.iter().any(|c| c.text.chars().count() > MAX_TITLE) || self.site.chars().count() > MAX_TITLE {
             return Err(format!("Checklist items and the site name are limited to {MAX_TITLE} characters."));
+        }
+        if self.activity.chars().count() > MAX_NAME {
+            return Err(format!("Keep the activity name under {MAX_NAME} characters."));
+        }
+        match &self.kind {
+            Kind::Target { goal, unit, every } => {
+                if !(1..=MAX_GOAL).contains(goal) {
+                    return Err(format!("A target must be between 1 and {MAX_GOAL}."));
+                }
+                if unit.chars().count() > MAX_NAME {
+                    return Err(format!("Keep the unit under {MAX_NAME} characters."));
+                }
+                if every.is_none() && self.due.is_none() {
+                    return Err("A target without a period needs a date to reach it by.".into());
+                }
+            }
+            Kind::Tally { unit } if unit.chars().count() > MAX_NAME => {
+                return Err(format!("Keep the unit under {MAX_NAME} characters."));
+            }
+            _ => {}
+        }
+        if self.is_counter() && self.repeat.is_some() {
+            return Err("Counters and repeating targets start a new period on their own; remove the repeat.".into());
         }
         if self.effort_min.is_some_and(|m| m > 7 * 24 * 60) {
             return Err("Effort is in minutes and can be at most a week.".into());
@@ -198,5 +277,29 @@ mod tests {
         t.repeat = None;
         t.id = "../etc".into();
         assert!(t.validate().is_err());
+    }
+
+    #[test]
+    fn kinds() {
+        let now: Timestamp = "2026-11-04T09:00:00Z".parse().unwrap();
+        let mut t = Task::new("Calls", now);
+        t.kind = Kind::Target { goal: 30, unit: "calls".into(), every: Some(Span::Week) };
+        assert!(t.validate().is_ok() && t.is_counter());
+        t.kind = Kind::Target { goal: 0, unit: String::new(), every: Some(Span::Week) };
+        assert!(t.validate().is_err());
+        // One total needs a date.
+        t.kind = Kind::Target { goal: 200, unit: String::new(), every: None };
+        assert!(t.validate().is_err());
+        t.due = Some(now);
+        assert!(t.validate().is_ok() && !t.is_counter());
+        t.kind = Kind::Tally { unit: "items".into() };
+        t.repeat = Some(Repeat::Daily { every: 1 });
+        assert!(t.validate().is_err());
+        // Tasks saved before kinds existed still load.
+        let old = r#"{"id":"0192f0c4-0000-7000-8000-000000000000","title":"x","due":null,"appointment":null,
+            "effortMin":null,"repeat":null,"snoozedUntil":null,"createdAt":"2026-11-04T09:00:00Z","updatedAt":"2026-11-04T09:00:00Z"}"#;
+        let t: Task = serde_json::from_str(old).unwrap();
+        assert_eq!(t.kind, Kind::Generic);
+        assert_eq!(t.activity_name(), "x");
     }
 }

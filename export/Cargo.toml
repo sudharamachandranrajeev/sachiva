@@ -1,0 +1,21 @@
+[package]
+name = "sachiva-export"
+version = "0.1.0"
+description = "Turns Sachiva reports into Excel, Word, PowerPoint and PDF files"
+license = "MIT"
+edition = "2024"
+
+[dependencies]
+sachiva-core = { path = "../core" }
+krilla = "0.8.2"
+krilla-svg = "0.8.1"
+resvg = { version = "0.47", default-features = false, features = ["text"] }
+rust_xlsxwriter = "=0.99.1"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+ttf-parser = "0.25"
+zip = { version = "8", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+roxmltree = "0.21"
+serde_json = "1"

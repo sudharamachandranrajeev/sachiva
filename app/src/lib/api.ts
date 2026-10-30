@@ -20,9 +20,24 @@ export interface CheckItem {
   done: boolean
 }
 
+export type Span = 'day' | 'week' | 'month'
+
+/** What sort of job this is; decides how the dashboard shows it. */
+export type Kind =
+  | { type: 'generic' }
+  | { type: 'deadline' }
+  | { type: 'target'; goal: number; unit: string; every: Span | null }
+  | { type: 'tally'; unit: string }
+  | { type: 'chase' }
+  | { type: 'checklist' }
+  | { type: 'appointment' }
+
 export interface Task {
   id: string
   title: string
+  kind: Kind
+  /** Groups counts in the performance report; empty = the title. */
+  activity: string
   notes: string
   due: string | null
   appointment: string | null
@@ -150,6 +165,151 @@ export interface RollbackPlan {
 
 export type Page = 'releases' | 'bug' | 'idea'
 
+export interface Progress {
+  taskId: string
+  done: number
+  goal: number | null
+  unit: string
+  /** The period it counts over; null for a one-off target. */
+  span: Span | null
+  today: number
+  week: number
+  month: number
+  expected: number | null
+  behind: boolean
+  /** [met, of] over the last periods. */
+  met: [number, number] | null
+  line: string
+}
+
+/** An open target or tally with its progress. */
+export interface Counter {
+  task: Task
+  progress: Progress
+}
+
+export interface Count {
+  id: number
+  taskId: string
+  at: string
+  delta: number
+  note: string
+}
+
+export interface WaitList {
+  id: string
+  name: string
+  site: string
+  clinic: string
+  provider: string
+  /** Upper band edges in weeks, rising. */
+  bands: number[]
+  targetWeeks: number | null
+  archived: boolean
+}
+
+/** Figures for one list and period. null = not entered (never 0). */
+export interface Figures {
+  listId: string
+  span: Span
+  /** First day of the period, YYYY-MM-DD. */
+  start: string
+  total: number | null
+  added: number | null
+  removed: number | null
+  booked: number | null
+  bands: (number | null)[]
+  longestWeeks: number | null
+  note: string
+}
+
+export type ReportKind = 'performance' | 'waitingList'
+export type ExportFormat = 'xlsx' | 'docx' | 'pptx' | 'pdf'
+
+export interface ReportRequest {
+  kind: ReportKind
+  span: Span
+  from: string
+  to: string
+  activities: string[]
+  lists: string[]
+}
+
+export type SpcPoint = 'common' | 'improvement' | 'concern' | 'neutral'
+export interface Variation {
+  point: SpcPoint
+  high: boolean
+}
+export type Assurance = 'pass' | 'fail' | 'inconsistent'
+
+export interface Spc {
+  mean: number
+  upper: number
+  lower: number
+  points: (SpcPoint | null)[]
+  trial: boolean
+  variation: Variation
+  assurance: Assurance | null
+}
+
+export interface Series {
+  name: string
+  values: (number | null)[]
+}
+
+export type ChartBody =
+  | {
+      type: 'spc'
+      values: (number | null)[]
+      spc: Spc | null
+      target: number | null
+      better: 'higher' | 'lower' | 'neither'
+    }
+  | { type: 'bars'; series: Series[]; stacked: boolean }
+
+export interface Chart {
+  title: string
+  alt: string
+  yLabel: string
+  labels: string[]
+  body: ChartBody
+}
+
+export interface SummaryRow {
+  measure: string
+  latest: number | null
+  target: number | null
+  variation: Variation | null
+  assurance: Assurance | null
+  met: string
+}
+
+/** A table cell: text, or a number (null = not entered). */
+export type Cell = string | number | null
+
+export interface Section {
+  title: string
+  intro: string
+  charts: Chart[]
+  table: { columns: string[]; rows: Cell[][] }
+}
+
+export interface Report {
+  title: string
+  period: string
+  made: string
+  footnote: string
+  summary: SummaryRow[]
+  sections: Section[]
+}
+
+export interface Preview {
+  report: Report
+  /** The summary table as text, as in the exports. */
+  summary: string[][]
+  /** SVG text per chart, per section. */
+  charts: string[][]
+}
 
 export const api = {
   status: () => invoke<AppStatus>('status'),
@@ -194,6 +354,19 @@ export const api = {
   alarmAccess: () => invoke<AlarmAccess>('alarm_access'),
   openAlarmSettings: () => invoke<void>('open_alarm_settings'),
   openBatterySettings: () => invoke<void>('open_battery_settings'),
+  counters: () => invoke<Counter[]>('counters'),
+  /** Negative `delta` takes away; a correction is a new entry. */
+  addCount: (id: string, delta: number, note = '') => invoke<Progress>('add_count', { id, delta, note }),
+  recentCounts: (id: string) => invoke<Count[]>('recent_counts', { id }),
+  waitlists: () => invoke<WaitList[]>('waitlists'),
+  newWaitlist: (name: string) => invoke<WaitList>('new_waitlist', { name }),
+  saveWaitlist: (list: WaitList) => invoke<WaitList>('save_waitlist', { list }),
+  getFigures: (listId: string, span: Span, start: string) =>
+    invoke<Figures>('get_figures', { listId, span, start }),
+  saveFigures: (figures: Figures) => invoke<void>('save_figures', { figures }),
+  previewReport: (req: ReportRequest) => invoke<Preview>('preview_report', { req }),
+  /** False when the user cancelled the save dialog. */
+  exportReport: (req: ReportRequest, format: ExportFormat) => invoke<boolean>('export_report', { req, format }),
 }
 
 /** Download progress of an update: bytes so far and the total, if known. */

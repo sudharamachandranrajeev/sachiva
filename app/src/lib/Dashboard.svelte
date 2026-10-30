@@ -5,6 +5,7 @@
   import { app } from './state.svelte'
   import { prefs } from './prefs.svelte'
   import { greeting, longDate } from './time'
+  import Counters from './Counters.svelte'
   import ScoreRing from './ScoreRing.svelte'
   import TaskRow from './TaskRow.svelte'
 
@@ -106,6 +107,8 @@
         <div class="why">Add a job with <b>Quick capture</b>, or press <kbd>N</kbd>.</div>
       </div>
     {/if}
+
+    <Counters counters={app.counters} />
 
     <div class="lanes">
       {#each lanes as l (l.lane)}

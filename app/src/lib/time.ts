@@ -58,3 +58,18 @@ export function minutesToTomorrowMorning(now = new Date()): number {
   const t = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0)
   return Math.max(1, Math.round((t.getTime() - now.getTime()) / 60_000))
 }
+
+/** A local date as YYYY-MM-DD, for `date` inputs and the Rust side. */
+export function isoDay(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** How reports name a period: "4 Nov 2026", "w/c 2 Nov 2026", "Nov 2026". */
+export function periodLabel(span: 'day' | 'week' | 'month', start: string): string {
+  const [y, m, d] = start.split('-').map(Number)
+  const date = `${d} ${months[m - 1]} ${y}`
+  return span === 'month' ? `${months[m - 1]} ${y}` : span === 'week' ? `w/c ${date}` : date
+}

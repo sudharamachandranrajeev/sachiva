@@ -39,6 +39,12 @@ warns you if something you type looks like a health number, phone number, birth 
 - ⏳ **Waiting on others** – hand a job to a supplier or a colleague and set a date to chase them.
 - 🔁 **Repeating jobs and checklists** – weekly stock checks, month-end returns, every few days after it was
   last done.
+- 🔢 **Targets and tallies** – "40 referrals a week" or "60 notes by Friday", with a progress bar and a nudge
+  when you fall behind. Or just count: calls, bookings, work-queue items sorted. Press **+1** as you go.
+- 📋 **Waiting lists** – enter each list's figures daily, weekly or monthly: how many wait, joined, left and
+  were booked, how long they wait (in bands), and the longest wait. Split by site, clinic and provider.
+- 📊 **Reports** – charts in the "Making Data Count" style used across health services, which show real
+  change apart from ordinary ups and downs. Save them as Excel, Word, PowerPoint or PDF.
 - 🛡️ **Confidentiality check** – warns, before you keep a job, if the text may identify a person.
 - ↩️ **Undo and trash** – undo any change; deleted jobs stay restorable for 30 days.
 - 🔒 **Encrypted and offline** – your data stays on your device in an encrypted database, with a daily backup.
@@ -67,6 +73,16 @@ warns you if something you type looks like a health number, phone number, birth 
     <td align="center">On a phone</td>
     <td align="center">Your recovery key</td>
     <td align="center">Asks before updating</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/dashboard.png" alt="Dashboard with target and tally cards" width="280"></td>
+    <td><img src="docs/screenshots/waiting-lists.png" alt="Entering a week's waiting-list figures" width="280"></td>
+    <td><img src="docs/screenshots/report-performance.png" alt="A performance report with control charts" width="280"></td>
+  </tr>
+  <tr>
+    <td align="center">Targets and tallies</td>
+    <td align="center">Waiting-list figures</td>
+    <td align="center">Reports</td>
   </tr>
 </table>
 
@@ -174,6 +190,45 @@ flowchart LR
 - Jobs **waiting on someone** count for less until it is time to chase them.
 - **Reminders** are worked out from the same rules, so the dashboard and your notifications always agree.
 - Every number on the dashboard explains itself: tap it.
+
+### Targets, waiting lists and reports
+
+**Keep a count**
+
+1. Open a job (or make one) and set **Type of job** to **Target** or **Tally**.
+2. For a target, give the number, what you count (such as "referrals") and how often: per day, week or
+   month, or once by the job's due date.
+3. On the dashboard, press **+1** each time, or type a number and press **Add**. **Undo last** takes the last
+   entry back. Nothing is erased: a correction is a new entry, so the record stays complete.
+4. A target that falls behind an even pace says **Behind**, and Sachiva reminds you during working hours.
+
+**Keep waiting-list figures**
+
+1. Open **Waiting lists** and add a list, such as "Follow-ups, Clinic A".
+2. Under **About this list**, add the site, clinic and provider (initials or a role, never a name), the
+   wait bands in weeks (for example `9, 18, 52`) and, if you have one, a target for the longest wait.
+3. Under **Figures**, pick **Day**, **Week** or **Month** and any day in that period, fill in what you
+   have and press **Save figures**. Leave a box empty if you do not know it: empty means "not entered",
+   never 0.
+
+**Make a report**
+
+1. Open **Reports**. Choose **My counts** or **Waiting lists**, how long each point is, and the dates.
+2. Press **Show report** to see it, or **Excel**, **Word**, **PowerPoint** or **PDF** to save a file.
+
+How to read the charts:
+
+- Each chart shows the figures, their average (solid line) and process limits (dashed lines).
+- A **blue** point is a real change for the better, an **orange** point a real change for the worse,
+  and a **grey** point ordinary variation.
+- With fewer than 15 points the limits are marked as trial limits.
+- The red line is the target. **Assurance** says if the target will be met every time, never, or
+  only sometimes.
+- The week or month still running is left out of the chart (a part-week would look like a fall). The
+  table shows it as "so far".
+
+The files carry no logos. The PDF is tagged for screen readers (PDF/UA), and every chart has a text
+description.
 
 ## 🔒 Your data
 
@@ -284,7 +339,8 @@ Layout:
 
 | Folder | What is in it |
 | --- | --- |
-| `core/` | The rules, in Rust: jobs, score, repeats, reminders, checker, encrypted store, backups |
+| `core/` | The rules, in Rust: jobs, score, repeats, reminders, counts, waiting lists, control charts, checker, encrypted store, backups |
+| `export/` | Writes reports as Excel, Word, PowerPoint and PDF, and draws the charts |
 | `app/src-tauri/` | The app shell: commands, tray, reminder timer, Android alarms |
 | `app/src/` | The screens (Svelte) |
 | `plugins/device/` | Keeping the database key safe on each platform, Android alarm settings |
