@@ -3,6 +3,7 @@
   import { app } from './state.svelte'
   import { api } from './api'
   import { when, minutes } from './time'
+  import PrioritySelect from './PrioritySelect.svelte'
 
   let {
     task,
@@ -52,9 +53,10 @@
     {#if meta}<span class="m">{meta}</span>{/if}
     {#if why}<span class="m why">{why}</span>{/if}
   </button>
+  {#if !done}<div class="priority"><PrioritySelect {task} /></div>{/if}
   {#if !done && !app.focusSessions.some((s) => !s.endedAt)}<button class="btn focus-btn" onclick={() => app.act(() => api.startFocus(task.id), 'Focus started.')} aria-label="Start focus on {task.title}">Focus</button>{/if}
   {#if score != null}
-    <span class="s" title="Priority score, 0 to 99. Higher means do it sooner.">{score}</span>
+    <span class="s" title="Urgency score within this priority level, 0 to 99.">{score}</span>
   {/if}
 </div>
 
@@ -63,7 +65,7 @@
     padding: 10px 12px;
     margin-bottom: 8px;
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr) auto auto;
+    grid-template-columns: 20px minmax(0, 1fr) auto auto auto;
     gap: 10px;
     align-items: start;
     border-radius: 14px;
@@ -126,6 +128,7 @@
   .why {
     font-style: italic;
   }
+  @media (max-width: 600px) { .task { grid-template-columns: 20px minmax(0, 1fr) auto auto; } .priority { grid-column: 2; } }
   .focus-btn { font-size: 12px; padding: 3px 7px; }
   .s {
     font-size: 12px;

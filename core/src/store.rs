@@ -19,6 +19,8 @@ use crate::waitlist::{Figures, WaitList};
 
 mod clinic;
 pub mod focus;
+pub mod priority_learning;
+pub mod priority_levels;
 mod records;
 mod work;
 
@@ -129,6 +131,9 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE task_templates (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);",
     "CREATE TABLE focus_sessions (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
      CREATE UNIQUE INDEX focus_one_active ON focus_sessions((1)) WHERE json_extract(json, '$.endedAt') IS NULL;",
+    // Older binaries cannot decode the new importance levels; reject downgrade safely.
+    "CREATE TABLE priority_feedback (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+     CREATE TABLE priority_config (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);",
 ];
 
 pub struct Store {
@@ -322,6 +327,8 @@ impl Store {
         // Focus records retain the task title, so purge them and their undo rows with the task.
         tx.execute("DELETE FROM history WHERE entity = 'focus' AND task_id IN (SELECT id FROM focus_sessions WHERE json_extract(json, '$.taskId') IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?))", [cut])?;
         tx.execute("DELETE FROM focus_sessions WHERE json_extract(json, '$.taskId') IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)", [cut])?;
+        tx.execute("DELETE FROM history WHERE entity = 'priority_feedback' AND task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)", [cut])?;
+        tx.execute("DELETE FROM priority_feedback WHERE id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)", [cut])?;
         let n = tx.execute("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?", [cut])?;
         tx.execute("DELETE FROM history WHERE at < ?", [cut])?;
         tx.commit()?;
@@ -516,8 +523,15 @@ impl Store {
 fn put(tx: &rusqlite::Transaction, group: i64, task: &Task, label: &str, now: Timestamp) -> Result<()> {
     task.validate().map_err(Error::Invalid)?;
     let old: Option<String> = tx.query_row("SELECT json FROM tasks WHERE id=?", [&task.id], |r| r.get(0)).optional()?;
-    if let Some(old) = old.as_deref() {
-        crate::work::Workflow::check_change(&serde_json::from_str(old)?, task).map_err(Error::Invalid)?;
+    let previous: Option<Task> = old.as_deref().map(serde_json::from_str).transpose()?;
+    if let Some(previous) = &previous {
+        crate::work::Workflow::check_change(previous, task).map_err(Error::Invalid)?;
+    }
+    if let Some(id) = &task.priority_level {
+        let config = priority_levels::load_config(tx)?;
+        if !config.levels.iter().any(|p| &p.id == id) || crate::model::Importance::from_id(id).is_some() {
+            return Err(Error::Invalid("Choose an existing custom priority level.".into()));
+        }
     }
     if let Some(crate::work::Workflow::Session { list_id, .. }) = &task.workflow {
         let json: Option<String> =
@@ -532,6 +546,9 @@ fn put(tx: &rusqlite::Transaction, group: i64, task: &Task, label: &str, now: Ti
         }
     }
     record(tx, group, &task.id, label, now)?;
+    if previous.as_ref().is_some_and(|t| t.priority_id() != task.priority_id()) {
+        records::put(tx, group, "priority_feedback", &task.id, &true, label, now)?;
+    }
     tx.execute(
         "INSERT INTO tasks (id, json, updated_at, deleted_at) VALUES (?1, ?2, ?3, NULL)
          ON CONFLICT(id) DO UPDATE SET json = ?2, updated_at = ?3",

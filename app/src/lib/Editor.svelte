@@ -4,6 +4,8 @@
   import { app } from './state.svelte'
   import { fromInput, minutesToTomorrowMorning, toInput, when } from './time'
   import WorkflowFields from './WorkflowFields.svelte'
+  import { priorityId, priorityLabel, setTaskPriority } from './importance'
+  import type { PrioritySuggestion } from './api'
 
   let { task: initial, isNew }: { task: Task; isNew: boolean } = $props()
 
@@ -16,6 +18,7 @@
   let timer: ReturnType<typeof setTimeout> | undefined
   let saveState = $state<'idle' | 'saving' | 'saved' | 'error'>('idle')
   let error = $state('')
+  let suggestion = $state<PrioritySuggestion | null>(null)
   let findings = $state<{ field: string; f: Finding }[]>([])
   let dialog: HTMLDialogElement
   // svelte-ignore state_referenced_locally
@@ -69,6 +72,17 @@
     }
     clearTimeout(timer)
     timer = setTimeout(save, 600)
+  })
+
+  $effect(() => {
+    const title = t.title
+    const id = t.id
+    let active = true
+    const timer = setTimeout(async () => {
+      try { const result = await api.suggestPriority(title, id); if (active) suggestion = result }
+      catch { if (active) suggestion = null }
+    }, 400)
+    return () => { active = false; clearTimeout(timer) }
   })
 
   async function save() {
@@ -312,16 +326,15 @@
       </label>
       <div class="field-group">
         <span class="label">Importance</span>
-        <div class="seg" role="radiogroup" aria-label="Importance">
-          {#each [['low', 'Low'], ['normal', 'Normal'], ['high', 'Important']] as [v, name] (v)}
-            <button
-              role="radio"
-              aria-checked={t.importance === v}
-              class:sel={t.importance === v}
-              onclick={() => (t.importance = v as Task['importance'])}>{name}</button
-            >
-          {/each}
-        </div>
+        <select aria-label="Priority" value={priorityId(t)} onchange={(e) => setTaskPriority(t, e.currentTarget.value)}>
+          {#each app.priorityConfig.levels as p (p.id)}<option value={p.id}>{p.label}</option>{/each}
+        </select>
+        <button class="btn" onclick={() => (app.managingPriorities = true)}>Add or reorder priorities</button>
+        {#if suggestion && suggestion.levelId !== priorityId(t)}
+          <p class="muted">Suggested {priorityLabel(suggestion.levelId, app.priorityConfig)} from {suggestion.examples} similar jobs you reprioritised.
+            <button class="btn" onclick={() => setTaskPriority(t, suggestion!.levelId)}>Apply suggestion</button>
+          </p>
+        {/if}
       </div>
     </div>
 
@@ -533,6 +546,8 @@
     border-radius: 10px;
     overflow: hidden;
     width: fit-content;
+    max-width: 100%;
+    flex-wrap: wrap;
   }
   .seg button {
     padding: 8px 12px;

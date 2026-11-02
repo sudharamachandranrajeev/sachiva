@@ -10,6 +10,7 @@
   import ClinicSummary from './ClinicSummary.svelte'
   import ScoreRing from './ScoreRing.svelte'
   import TaskRow from './TaskRow.svelte'
+  import PrioritySelect from './PrioritySelect.svelte'
 
   let { now, alarms }: { now: Date; alarms: AlarmAccess | null } = $props()
 
@@ -46,6 +47,7 @@
   <div>
     <h1>{greeting(now)}</h1>
     <div class="muted sub">{longDate(now)} · {open} open {open === 1 ? 'job' : 'jobs'}</div>
+    <button class="btn" onclick={() => (app.managingPriorities = true)}>Add or reorder priorities</button>
   </div>
   {#if d}
     <div class="kpis">
@@ -99,6 +101,7 @@
               onclick={() => app.act(() => api.snooze(n.task.id, 60), 'Reminders quiet for an hour.')}>I'm on it</button
             >
             <button class="btn" onclick={() => app.edit(n.task)}>Open</button>
+            <PrioritySelect task={n.task} />
             {#if !app.focusSessions.some((s) => !s.endedAt)}<button class="btn" onclick={() => app.act(() => api.startFocus(n.task.id), 'Focus started.')}>Start focus</button>{/if}
           </div>
         </div>
@@ -150,9 +153,9 @@
     <div class="card box">
       <h3>What is the score?</h3>
       <p class="muted">
-        0 to 99. It rises as a deadline gets close compared with how long the job takes, and for jobs you marked
+        0 to 99. Within a priority level it rises as a deadline gets close compared with how long the job takes, and for jobs you marked
         important. Overdue jobs climb further. Jobs waiting on someone count for less until it is time to chase them.
-        Pinned jobs come first, except that an urgent job always takes the "Do this now" card.
+        Your priority order decides which jobs come first. Within the same level, an urgent job can take the "Do this now" card ahead of a pin.
       </p>
     </div>
     <div class="card box">

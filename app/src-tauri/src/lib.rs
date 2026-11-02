@@ -17,7 +17,7 @@ use sachiva_core::checker::{self, Finding};
 use sachiva_core::dashboard::{self, Dashboard};
 use sachiva_core::jiff::tz::TimeZone;
 use sachiva_core::jiff::{SignedDuration, Timestamp};
-use sachiva_core::model::{Status, Task};
+use sachiva_core::model::{Importance, Status, Task};
 use sachiva_core::reminders::{self, Reminder};
 use sachiva_core::store::{Store, Trashed};
 use serde::Serialize;
@@ -201,8 +201,8 @@ fn unlock_with(app: AppHandle, state: State<App>, recovery: String) -> CommandRe
 
 #[tauri::command]
 fn get_dashboard(state: State<App>) -> CommandResult<Dashboard> {
-    let tasks = state.with(|s| s.tasks())?;
-    Ok(dashboard::build(&tasks, Timestamp::now(), &state.tz, state.settings().urgent_score))
+    let (tasks, levels) = state.with(|s| Ok((s.tasks()?, s.priority_levels()?)))?;
+    Ok(dashboard::build_with_levels(&tasks, Timestamp::now(), &state.tz, state.settings().urgent_score, &levels))
 }
 
 /// Finished jobs, newest first.
@@ -228,6 +228,56 @@ fn save_task(app: AppHandle, state: State<App>, mut task: Task) -> CommandResult
     state.with(|s| s.save(&task, now))?;
     changed(&app);
     Ok(task)
+}
+
+#[tauri::command]
+fn priority_levels(state: State<App>) -> CommandResult<sachiva_core::priority::PriorityConfig> {
+    state.with(|s| s.priority_levels())
+}
+
+#[tauri::command]
+fn save_priority_levels(
+    app: AppHandle,
+    state: State<App>,
+    config: sachiva_core::priority::PriorityConfig,
+) -> CommandResult<sachiva_core::priority::PriorityConfig> {
+    let config = state.with(|s| s.save_priority_levels(config, Timestamp::now()))?;
+    changed(&app);
+    Ok(config)
+}
+
+#[tauri::command]
+fn set_importance(app: AppHandle, state: State<App>, id: String, level_id: String) -> CommandResult<()> {
+    let now = Timestamp::now();
+    state.with(|s| {
+        if !s.priority_levels()?.levels.iter().any(|p| p.id == level_id) {
+            return Err(sachiva_core::store::Error::Invalid("Choose an existing priority.".into()));
+        }
+        let mut task = s.task(&id)?;
+        if task.priority_id() == level_id {
+            return Ok(());
+        }
+        if let Some(builtin) = Importance::from_id(&level_id) {
+            task.importance = builtin;
+            task.priority_level = None;
+        } else {
+            task.importance = Importance::Normal;
+            task.priority_level = Some(level_id);
+        }
+        task.updated_at = now;
+        s.save(&task, now)
+    })?;
+    changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn suggest_priority(
+    state: State<App>,
+    title: String,
+    exclude: Option<String>,
+) -> CommandResult<Option<sachiva_core::store::priority_learning::PrioritySuggestion>> {
+    state.with(|s| s.suggest_priority(&title, exclude.as_deref()))
 }
 
 #[tauri::command]
@@ -352,8 +402,8 @@ fn changed(app: &AppHandle) {
 /// Reminders due in `(from, to]`, at most one per task (the latest).
 fn due_reminders(state: &App, from: Timestamp, to: Timestamp) -> Vec<Reminder> {
     let settings = state.settings();
-    let Ok(tasks) = state.with(|s| s.tasks()) else { return Vec::new() };
-    let mut due: Vec<Reminder> = sachiva_core::priority::rank(&tasks, to)
+    let Ok((tasks, levels)) = state.with(|s| Ok((s.tasks()?, s.priority_levels()?))) else { return Vec::new() };
+    let mut due: Vec<Reminder> = sachiva_core::priority::rank_with_levels(&tasks, to, &levels)
         .into_iter()
         .filter_map(|(t, p)| reminders::between(t, &p, from, to, &settings, &state.tz).pop())
         .collect();
@@ -398,8 +448,8 @@ fn schedule_alarms(app: &AppHandle) {
     let state = app.state::<App>();
     let now = Timestamp::now();
     let settings = state.settings();
-    let Ok(tasks) = state.with(|s| s.tasks()) else { return };
-    let mut all: Vec<Reminder> = sachiva_core::priority::rank(&tasks, now)
+    let Ok((tasks, levels)) = state.with(|s| Ok((s.tasks()?, s.priority_levels()?))) else { return };
+    let mut all: Vec<Reminder> = sachiva_core::priority::rank_with_levels(&tasks, now, &levels)
         .into_iter()
         .flat_map(|(t, p)| {
             reminders::between(t, &p, now, now + SignedDuration::from_hours(24 * DAYS), &settings, &state.tz)
@@ -606,6 +656,10 @@ pub fn run() {
             done_tasks,
             new_task,
             save_task,
+            set_importance,
+            priority_levels,
+            save_priority_levels,
+            suggest_priority,
             complete,
             reopen,
             delete_task,

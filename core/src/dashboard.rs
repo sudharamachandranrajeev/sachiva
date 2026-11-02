@@ -50,6 +50,16 @@ pub struct Dashboard {
 /// `urgent_score` is the reminder setting: an urgent job takes the "now" card
 /// even over a pinned one, because pins are for order, not for emergencies.
 pub fn build(tasks: &[Task], now: Timestamp, tz: &TimeZone, urgent_score: u8) -> Dashboard {
+    build_with_levels(tasks, now, tz, urgent_score, &priority::PriorityConfig::default())
+}
+
+pub fn build_with_levels(
+    tasks: &[Task],
+    now: Timestamp,
+    tz: &TimeZone,
+    urgent_score: u8,
+    levels: &priority::PriorityConfig,
+) -> Dashboard {
     let end_of_day = now
         .to_zoned(tz.clone())
         .tomorrow()
@@ -59,7 +69,7 @@ pub fn build(tasks: &[Task], now: Timestamp, tz: &TimeZone, urgent_score: u8) ->
         .unwrap_or(now);
     let start_of_day = now.to_zoned(tz.clone()).start_of_day().map(|z| z.timestamp()).unwrap_or(now);
 
-    let mut items: Vec<Item> = priority::rank(tasks, now)
+    let mut items: Vec<Item> = priority::rank_with_levels(tasks, now, levels)
         .into_iter()
         .map(|(t, p)| {
             let lane = lane(t, &p, end_of_day, now);
@@ -77,15 +87,19 @@ pub fn build(tasks: &[Task], now: Timestamp, tz: &TimeZone, urgent_score: u8) ->
         .count();
 
     // "Now" is the top job you can act on: not one still waiting on someone.
-    // The most urgent job comes before pinned ones.
-    let actionable = |i: &Item| i.lane != Lane::Waiting || i.score >= 60;
+    // Choose the highest level first; urgency can beat a pin within that level.
+    let actionable = |i: &Item| match &i.task.status {
+        Status::Waiting { chase, .. } => chase.is_some_and(|c| c <= now),
+        _ => true,
+    };
+    let highest_tier = items.iter().filter(|i| actionable(i)).map(|i| levels.rank(&i.task)).max();
     let pick = items
         .iter()
         .enumerate()
-        .filter(|(_, i)| actionable(i) && i.score >= urgent_score)
+        .filter(|(_, i)| actionable(i) && Some(levels.rank(&i.task)) == highest_tier && i.score >= urgent_score)
         .max_by_key(|(n, i)| (i.score, std::cmp::Reverse(*n)))
         .map(|(n, _)| n)
-        .or_else(|| items.iter().position(actionable));
+        .or_else(|| items.iter().position(|i| actionable(i) && Some(levels.rank(&i.task)) == highest_tier));
     let now_item = pick.map(|i| items.remove(i));
 
     let figures = vec![
@@ -168,6 +182,28 @@ mod tests {
             (1, 1, 1, 1, 1)
         );
         assert!(d.figures.iter().all(|f| !f.explain.is_empty()));
+    }
+
+    #[test]
+    fn explicit_levels_outrank_score_and_pins_but_not_future_chases() {
+        use crate::model::Importance;
+        let now = at("2026-11-04T12:00:00Z");
+        let mut high = Task::new("High", now);
+        high.importance = Importance::High;
+        high.due = Some(at("2026-11-04T11:00:00Z"));
+        high.pinned = true;
+        let mut very = Task::new("Very high", now);
+        very.importance = Importance::VeryHigh;
+        let mut extreme = Task::new("Extremely high", now);
+        extreme.importance = Importance::ExtremelyHigh;
+        let d = build(&[high.clone(), very.clone(), extreme.clone()], now, &TimeZone::UTC, 85);
+        assert_eq!(d.now.unwrap().task.title, "Extremely high");
+        assert_eq!(d.items[0].task.title, "Very high");
+        let d = build(&[high.clone(), very.clone()], now, &TimeZone::UTC, 85);
+        assert_eq!(d.now.unwrap().task.title, "Very high");
+        extreme.status = Status::Waiting { on: "supplier".into(), chase: Some(at("2026-11-05T12:00:00Z")) };
+        let d = build(&[high, extreme], now, &TimeZone::UTC, 85);
+        assert_eq!(d.now.unwrap().task.title, "High");
     }
 
     #[test]

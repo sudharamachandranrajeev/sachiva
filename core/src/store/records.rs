@@ -8,6 +8,8 @@ pub(super) fn table(entity: &str) -> Result<&'static str> {
         "clinic_slot" => Ok("clinic_slots"),
         "template" => Ok("task_templates"),
         "focus" => Ok("focus_sessions"),
+        "priority_feedback" => Ok("priority_feedback"),
+        "priority_config" => Ok("priority_config"),
         _ => Err(Error::Invalid("Unknown history record type.".into())),
     }
 }

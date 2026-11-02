@@ -2,21 +2,55 @@
 //!
 //! Urgency is the time left before the deadline minus the work still needed
 //! ("slack"). With no slack left urgency is full (60); every day of slack
-//! halves it. Importance adds or removes points. Tasks waiting on someone
+//! halves it. Priority levels determine order; urgency and pins break ties. Tasks waiting on someone
 //! score on their chase date instead, at half weight until it arrives.
 
 use jiff::Timestamp;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::model::{Importance, Status, Task};
 
 const FULL_URGENCY: f64 = 60.0;
 const DEFAULT_EFFORT_MIN: u32 = 15;
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PriorityLevel {
+    pub id: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PriorityConfig {
+    pub revision: u32,
+    pub levels: Vec<PriorityLevel>,
+}
+
+impl Default for PriorityConfig {
+    fn default() -> Self {
+        let levels = [
+            ("low", "Low"),
+            ("normal", "Normal"),
+            ("high", "High"),
+            ("veryHigh", "Very high"),
+            ("extremelyHigh", "Extremely high"),
+        ]
+        .into_iter()
+        .map(|(id, label)| PriorityLevel { id: id.into(), label: label.into() })
+        .collect();
+        Self { revision: 0, levels }
+    }
+}
+impl PriorityConfig {
+    pub fn rank(&self, task: &Task) -> usize {
+        self.levels.iter().position(|p| p.id == task.priority_id()).unwrap_or(0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Priority {
     pub score: u8,
     pub pinned: bool,
+    pub level_rank: usize,
     pub overdue: bool,
     /// Most important reason first.
     pub reasons: Vec<String>,
@@ -36,6 +70,10 @@ impl Priority {
 
 /// `None` for finished tasks and counters: they are not ranked.
 pub fn score(task: &Task, now: Timestamp) -> Option<Priority> {
+    score_with_levels(task, now, &PriorityConfig::default())
+}
+
+pub fn score_with_levels(task: &Task, now: Timestamp, levels: &PriorityConfig) -> Option<Priority> {
     if task.is_done() || task.is_counter() {
         return None;
     }
@@ -92,6 +130,14 @@ pub fn score(task: &Task, now: Timestamp) -> Option<Priority> {
     };
 
     let importance = match task.importance {
+        Importance::ExtremelyHigh => {
+            reasons.push("marked extremely high priority".to_string());
+            45.0
+        }
+        Importance::VeryHigh => {
+            reasons.push("marked very high priority".to_string());
+            35.0
+        }
         Importance::High => {
             reasons.push("marked important".to_string());
             25.0
@@ -102,17 +148,41 @@ pub fn score(task: &Task, now: Timestamp) -> Option<Priority> {
             -10.0
         }
     };
+    if let Some(id) = task.priority_level.as_deref()
+        && let Some(level) = levels.levels.iter().find(|p| p.id == id)
+    {
+        reasons.push(format!("marked {} priority", level.label));
+    }
     let overdue_bonus = if overdue { 10.0 } else { 0.0 };
     let raw = (urgency + overdue_bonus) * weight + importance + 10.0;
-    Some(Priority { score: raw.clamp(0.0, 99.0).round() as u8, pinned: task.pinned, overdue, reasons })
+    let level_rank = levels.rank(task);
+    let high_rank = levels.levels.iter().position(|p| p.id == "high").unwrap_or(2);
+    let floor = if level_rank > high_rank + 1 {
+        95
+    } else if level_rank > high_rank {
+        85
+    } else {
+        0
+    };
+    Some(Priority {
+        score: (raw.clamp(0.0, 99.0).round() as u8).max(floor),
+        pinned: task.pinned,
+        overdue,
+        level_rank,
+        reasons,
+    })
 }
 
-/// Rank open tasks: pinned first, then by score, then by deadline.
 pub fn rank(tasks: &[Task], now: Timestamp) -> Vec<(&Task, Priority)> {
-    let mut v: Vec<_> = tasks.iter().filter_map(|t| score(t, now).map(|p| (t, p))).collect();
+    rank_with_levels(tasks, now, &PriorityConfig::default())
+}
+
+pub fn rank_with_levels<'a>(tasks: &'a [Task], now: Timestamp, levels: &PriorityConfig) -> Vec<(&'a Task, Priority)> {
+    let mut v: Vec<_> = tasks.iter().filter_map(|t| score_with_levels(t, now, levels).map(|p| (t, p))).collect();
     v.sort_by(|(a, pa), (b, pb)| {
-        pb.pinned
-            .cmp(&pa.pinned)
+        pb.level_rank
+            .cmp(&pa.level_rank)
+            .then(pb.pinned.cmp(&pa.pinned))
             .then(pb.score.cmp(&pa.score))
             .then(a.deadline().unwrap_or(Timestamp::MAX).cmp(&b.deadline().unwrap_or(Timestamp::MAX)))
     });

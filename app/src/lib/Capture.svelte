@@ -4,7 +4,8 @@
   import { app } from './state.svelte'
   import { draftFromNote, draftFromQuick } from './noteCapture'
   import { fromInput, toInput } from './time'
-  import type { Importance } from './api'
+  import type { PrioritySuggestion } from './api'
+  import { priorityLabel, setTaskPriority } from './importance'
 
   // Quick capture: type a title, press Enter. Details can follow later.
   let title = $state('')
@@ -15,10 +16,11 @@
   let reviewed = $state(false)
   let draftTitle = $state('')
   let due = $state<string | null>(null)
-  let importance = $state<Importance>('normal')
+  let importance = $state('normal')
   let site = $state('')
   let assumedTime = $state(false)
   let busy = $state(false)
+  let suggestion = $state<PrioritySuggestion | null>(null)
 
   onMount(() => dialog.showModal())
 
@@ -34,12 +36,16 @@
   async function preview(quick = false) {
     if (quick) { note = title; noteMode = true }
     const source = note
+    suggestion = null
     const quickDraft = quick ? draftFromQuick(source) : null
     const draft = quickDraft ?? draftFromNote(source)
     site = quickDraft?.site ?? ''
     draftTitle = draft.title
     due = draft.due
     importance = draft.importance
+    const priorityLine = source.match(/(?:^|\n)\s*(?:priority|importance)\s*:\s*(.+)\s*$/im)?.[1]?.trim().toLowerCase()
+    const named = app.priorityConfig.levels.find((p) => p.label.toLowerCase() === priorityLine)
+    if (named) importance = named.id
     assumedTime = !!due && !draft.dateHadTime
     try {
       const checked = await api.check(source)
@@ -59,6 +65,17 @@
     return () => { active = false; clearTimeout(h) }
   })
 
+  $effect(() => {
+    if (!noteMode || !reviewed) return
+    const text = draftTitle
+    let active = true
+    const timer = setTimeout(async () => {
+      try { const result = await api.suggestPriority(text); if (active) suggestion = result }
+      catch { if (active) suggestion = null }
+    }, 400)
+    return () => { active = false; clearTimeout(timer) }
+  })
+
   async function addNote() {
     if (!draftTitle.trim() || busy) return
     busy = true
@@ -66,7 +83,7 @@
       const task = await api.newTask(draftTitle.trim())
       task.notes = note.trim()
       task.due = due
-      task.importance = importance
+      setTaskPriority(task, importance)
       task.site = site.trim()
       const saved = await api.saveTask(task)
       await app.refresh()
@@ -112,7 +129,13 @@
         <label>Deadline <input type="datetime-local" value={toInput(due)} onchange={(e) => { due = fromInput(e.currentTarget.value); assumedTime = false }} /></label>
         {#if assumedTime}<p class="muted hint">No time was given; 17:00 is suggested. Please check it.</p>{/if}
         <label>Site <input bind:value={site} maxlength="300" placeholder="Optional" /></label>
-        <label>Priority <select bind:value={importance}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>
+        <button class="btn" onclick={() => (app.managingPriorities = true)}>Add or reorder priorities</button>
+        <label>Priority <select bind:value={importance}>{#each app.priorityConfig.levels as p (p.id)}<option value={p.id}>{p.label}</option>{/each}</select></label>
+        {#if suggestion && suggestion.levelId !== importance}
+          <p class="hint">Suggested {priorityLabel(suggestion.levelId, app.priorityConfig)} from {suggestion.examples} similar jobs you reprioritised.
+            <button class="btn" onclick={() => (importance = suggestion!.levelId)}>Apply suggestion</button>
+          </p>
+        {/if}
       </div>
       {#if findings.length}<div class="check" role="status">{#each findings as f, i (i)}<div>“{f.text}”. {f.message}</div>{/each}</div>{/if}
       <div class="row"><button class="btn p" onclick={addNote} disabled={!draftTitle.trim() || busy}>Add to dashboard</button></div>

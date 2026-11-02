@@ -39,3 +39,14 @@ test('quick capture does not treat email addresses as sites', async () => {
   assert.equal(d.title, 'Reply to person@example.com')
   assert.equal(d.importance, 'low')
 })
+
+
+test('understands very high and extremely high priority in messages and shorthand', async () => {
+  const { draftFromQuick } = await import('./noteCapture.ts')
+  assert.equal(draftFromNote('Subject: Arrange cover\nPriority: very high', now).importance, 'veryHigh')
+  assert.equal(draftFromNote('Arrange cover marked with very high', now).importance, 'veryHigh')
+  assert.equal(draftFromNote('Arrange cover: extremely high priority', now).importance, 'extremelyHigh')
+  const d = draftFromQuick('Arrange cover friday !extremelyhigh', now)
+  assert.equal(d.importance, 'extremelyHigh')
+  assert.equal(d.title, 'Arrange cover')
+})

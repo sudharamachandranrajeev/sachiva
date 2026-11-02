@@ -3,7 +3,9 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
-export type Importance = 'low' | 'normal' | 'high'
+export type Importance = 'low' | 'normal' | 'high' | 'veryHigh' | 'extremelyHigh'
+export interface PrioritySuggestion { levelId: string; examples: number }
+export interface PriorityConfig { revision: number; levels: { id: string; label: string }[] }
 export type Status =
   | { state: 'open' }
   | { state: 'waiting'; on: string; chase: string | null }
@@ -44,6 +46,7 @@ export interface Task {
   appointment: string | null
   effortMin: number | null
   importance: Importance
+  priorityLevel?: string | null
   status: Status
   pinned: boolean
   site: string
@@ -374,6 +377,10 @@ export const api = {
   doneTasks: () => invoke<Task[]>('done_tasks'),
   newTask: (title: string) => invoke<Task>('new_task', { title }),
   saveTask: (task: Task) => invoke<Task>('save_task', { task }),
+  setImportance: (id: string, levelId: string) => invoke<void>('set_importance', { id, levelId }),
+  priorityLevels: () => invoke<PriorityConfig>('priority_levels'),
+  savePriorityLevels: (config: PriorityConfig) => invoke<PriorityConfig>('save_priority_levels', { config }),
+  suggestPriority: (title: string, exclude: string | null = null) => invoke<PrioritySuggestion | null>('suggest_priority', { title, exclude }),
   complete: (id: string) => invoke<void>('complete', { id }),
   reopen: (id: string) => invoke<void>('reopen', { id }),
   deleteTask: (id: string) => invoke<void>('delete_task', { id }),

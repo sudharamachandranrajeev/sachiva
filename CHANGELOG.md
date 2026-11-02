@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add and reorder priority levels on the go, and change a saved job’s priority from the dashboard or task list. Very high and Extremely high are included by default.
+- Local, optional priority suggestions learn from changes to similar saved jobs; suggestions never change tasks automatically.
+
 - Focus timer and time log: start on an open job, stop to log time, and undo either action. Sessions survive a restart and are included in encrypted backups.
 
 - Quick capture can interpret shorthand such as “PO chase fri 2pm !high @site2” and lets you review it before saving.

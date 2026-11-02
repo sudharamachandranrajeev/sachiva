@@ -4,13 +4,37 @@
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub enum Importance {
     Low,
     #[default]
     Normal,
     High,
+    VeryHigh,
+    ExtremelyHigh,
+}
+
+impl Importance {
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::VeryHigh => "veryHigh",
+            Self::ExtremelyHigh => "extremelyHigh",
+        }
+    }
+    pub fn from_id(id: &str) -> Option<Self> {
+        match id {
+            "low" => Some(Self::Low),
+            "normal" => Some(Self::Normal),
+            "high" => Some(Self::High),
+            "veryHigh" => Some(Self::VeryHigh),
+            "extremelyHigh" => Some(Self::ExtremelyHigh),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -117,6 +141,9 @@ pub struct Task {
     pub effort_min: Option<u32>,
     #[serde(default)]
     pub importance: Importance,
+    /// Custom priority ID; absent for a built-in importance.
+    #[serde(default)]
+    pub priority_level: Option<String>,
     #[serde(default)]
     pub status: Status,
     #[serde(default)]
@@ -148,6 +175,7 @@ impl Task {
             appointment: None,
             effort_min: None,
             importance: Importance::Normal,
+            priority_level: None,
             status: Status::Open,
             pinned: false,
             site: String::new(),
@@ -158,6 +186,10 @@ impl Task {
             created_at: now,
             updated_at: now,
         }
+    }
+
+    pub fn priority_id(&self) -> &str {
+        self.priority_level.as_deref().unwrap_or(self.importance.id())
     }
 
     pub fn is_done(&self) -> bool {

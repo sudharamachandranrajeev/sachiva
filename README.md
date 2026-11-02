@@ -33,6 +33,7 @@ warns you if something you type looks like a health number, phone number, birth 
 
 - ⏱️ **Focus and time log** – start a timer on a job, stop it when finished, and review recorded sessions on the dashboard. The timer keeps running if the app closes.
 - 📝 **Create from a note** – paste a message, review its suggested title, deadline and priority, then add it. The original note stays with the job; extraction runs offline.
+- 🚦 **Priority and local suggestions** – change priority directly on a job; add levels and arrange them in the order you choose. By default Very high ranks above High and Extremely high above both. Sachiva can suggest a priority from similar jobs you reprioritised locally, for you to review.
 - 🎯 **Do this now** – one card shows the job to do next, with a score and the reason, such as "Due in 3 h,
   needs about 30 min, marked important."
 - 🗂️ **Lanes for the day** – Overdue, Today, and Waiting on others, updated by themselves as time passes.
@@ -189,8 +190,7 @@ flowchart LR
 ```
 
 - The **score** (0 to 99) rises as the deadline gets close compared with how long the job takes. Important
-  jobs get more; overdue jobs climb further. Pinned jobs come first,
-  but an urgent job always takes the **Do this now** card.
+  jobs get more; overdue jobs climb further. Jobs are ordered first by your priority levels, then by score and pins within each level. An urgent job can take the **Do this now** card ahead of a pin at the same level.
 - Jobs **waiting on someone** count for less until it is time to chase them.
 - **Reminders** are worked out from the same rules, so the dashboard and your notifications always agree.
 - Every number on the dashboard explains itself: tap it.

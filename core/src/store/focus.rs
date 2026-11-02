@@ -126,7 +126,7 @@ mod tests {
         )
         .unwrap();
         let mut store = Store::init(conn).unwrap();
-        assert_eq!(store.schema_version().unwrap(), 5);
+        assert_eq!(store.schema_version().unwrap(), MIGRATIONS.len() as i64);
         assert_eq!(store.task(&task.id).unwrap().title, "Existing job");
         assert!(store.focus_sessions().unwrap().is_empty());
         assert_eq!(store.undo().unwrap().unwrap().label, "old change");
