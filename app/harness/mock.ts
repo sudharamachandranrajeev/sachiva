@@ -34,6 +34,7 @@ mockIPC((cmd, args: any) => {
         notice: null, setupDone: mode !== 'setup' }
     case 'recovery_key': return '3f9a-0c21-7be4-91d0-55aa-e2c7-0f13-8b6d-c4e9-27f0-a1b3-6d58-9e02-f7c4-3a16-b8d5'
     case 'get_dashboard': return demo.dashboard
+    case 'import_calendar': return { imported: args.drafts.length, duplicates: 0 }
     case 'focus_sessions': return []
     case 'priority_levels': return { revision: 0, levels: [{id:'low',label:'Low'},{id:'normal',label:'Normal'},{id:'high',label:'High'},{id:'veryHigh',label:'Very high'},{id:'extremelyHigh',label:'Extremely high'}] }
     case 'suggest_priority': return null

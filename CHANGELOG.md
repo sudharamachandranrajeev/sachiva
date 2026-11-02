@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Import events and dated tasks from an .ics calendar after preview and confidentiality checks. Duplicate imports are skipped and a batch can be undone. Repeating entries and unknown time zones are reported for review.
+
 - Add and reorder priority levels on the go, and change a saved job’s priority from the dashboard or task list. Very high and Extremely high are included by default.
 - Local, optional priority suggestions learn from changes to similar saved jobs; suggestions never change tasks automatically.
 

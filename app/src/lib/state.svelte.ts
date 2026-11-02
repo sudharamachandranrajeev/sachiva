@@ -23,6 +23,7 @@ class AppState {
   clinicTab = $state<'figures' | 'refill' | 'work'>('figures')
   editing = $state<{ task: Task; isNew: boolean } | null>(null)
   capturing = $state(false)
+  importingCalendar = $state(false)
   toast = $state<Toast | null>(null)
   /** Bumped on every change so lists that fetch their own data reload. */
   version = $state(0)

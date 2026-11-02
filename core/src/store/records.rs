@@ -10,6 +10,7 @@ pub(super) fn table(entity: &str) -> Result<&'static str> {
         "focus" => Ok("focus_sessions"),
         "priority_feedback" => Ok("priority_feedback"),
         "priority_config" => Ok("priority_config"),
+        "calendar_import" => Ok("calendar_imports"),
         _ => Err(Error::Invalid("Unknown history record type.".into())),
     }
 }

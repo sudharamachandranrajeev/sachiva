@@ -7,7 +7,7 @@ pkgrel=1
 pkgdesc='Admin support desk: priorities, deadlines and reminders'
 arch=(x86_64)
 url='https://github.com/sudharamachandranrajeev/sachiva'
-license=(MIT)
+license=(MIT MPL-2.0)
 depends=(webkit2gtk-4.1 gtk3 libayatana-appindicator librsvg hicolor-icon-theme polkit)
 options=(!strip !debug)
 

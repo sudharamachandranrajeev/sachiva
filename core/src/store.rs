@@ -17,6 +17,7 @@ use crate::model::{Kind, Span, Task};
 use crate::recur;
 use crate::waitlist::{Figures, WaitList};
 
+pub mod calendar;
 mod clinic;
 pub mod focus;
 pub mod priority_learning;
@@ -134,6 +135,7 @@ const MIGRATIONS: &[&str] = &[
     // Older binaries cannot decode the new importance levels; reject downgrade safely.
     "CREATE TABLE priority_feedback (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
      CREATE TABLE priority_config (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);",
+    "CREATE TABLE calendar_imports (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);",
 ];
 
 pub struct Store {
@@ -329,6 +331,8 @@ impl Store {
         tx.execute("DELETE FROM focus_sessions WHERE json_extract(json, '$.taskId') IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)", [cut])?;
         tx.execute("DELETE FROM history WHERE entity = 'priority_feedback' AND task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)", [cut])?;
         tx.execute("DELETE FROM priority_feedback WHERE id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)", [cut])?;
+        tx.execute("DELETE FROM history WHERE entity = 'calendar_import' AND task_id IN (SELECT id FROM calendar_imports WHERE json_extract(json, '$.taskId') IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?))", [cut])?;
+        tx.execute("DELETE FROM calendar_imports WHERE json_extract(json, '$.taskId') IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)", [cut])?;
         let n = tx.execute("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?", [cut])?;
         tx.execute("DELETE FROM history WHERE at < ?", [cut])?;
         tx.commit()?;

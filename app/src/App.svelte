@@ -5,6 +5,7 @@
   import { app, type View } from './lib/state.svelte'
   import { prefs } from './lib/prefs.svelte'
   import Capture from './lib/Capture.svelte'
+  import CalendarImport from './lib/CalendarImport.svelte'
   import PriorityManager from './lib/PriorityManager.svelte'
   import Dashboard from './lib/Dashboard.svelte'
   import Editor from './lib/Editor.svelte'
@@ -91,7 +92,7 @@
   }
 
   function keys(e: KeyboardEvent) {
-    if (!app.status?.unlocked || app.status.recoveryPending || app.editing || app.capturing || app.managingPriorities || typing(e)) return
+    if (!app.status?.unlocked || app.status.recoveryPending || app.editing || app.capturing || app.importingCalendar || app.managingPriorities || typing(e)) return
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
       e.preventDefault()
       app.undo()
@@ -168,6 +169,7 @@
   {#if app.capturing}
     <Capture />
   {/if}
+  {#if app.importingCalendar}<CalendarImport />{/if}
   {#if app.managingPriorities}
     <PriorityManager />
   {/if}

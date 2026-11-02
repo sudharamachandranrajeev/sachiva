@@ -57,7 +57,7 @@
     <h1>Tasks</h1>
     <div class="muted sub">Every job, in priority order.</div>
   </div>
-  <button class="btn p" onclick={() => app.startNew()}>+ New job</button>
+  <div><button class="btn" onclick={() => (app.importingCalendar = true)}>Import calendar</button> <button class="btn p" onclick={() => app.startNew()}>+ New job</button></div>
 </div>
 
 <div class="tabs" role="tablist">

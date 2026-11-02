@@ -3,6 +3,7 @@
 //! it running so reminders arrive with the window closed; on Android the
 //! next few days of reminders are handed to the system as exact alarms.
 
+mod calendar;
 mod clinic;
 mod data;
 mod focus;
@@ -656,6 +657,7 @@ pub fn run() {
             done_tasks,
             new_task,
             save_task,
+            calendar::import_calendar,
             set_importance,
             priority_levels,
             save_priority_levels,

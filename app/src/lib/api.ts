@@ -2,6 +2,7 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import type { CalendarDraft } from './calendarImport'
 
 export type Importance = 'low' | 'normal' | 'high' | 'veryHigh' | 'extremelyHigh'
 export interface PrioritySuggestion { levelId: string; examples: number }
@@ -371,6 +372,7 @@ export const api = {
   recoverySaved: () => invoke<void>('recovery_saved'),
   unlockWith: (recovery: string) => invoke<void>('unlock_with', { recovery }),
   dashboard: () => invoke<Dashboard>('get_dashboard'),
+  importCalendar: (drafts: CalendarDraft[]) => invoke<{ imported: number; duplicates: number }>('import_calendar', { drafts }),
   focusSessions: () => invoke<FocusSession[]>('focus_sessions'),
   startFocus: (taskId: string) => invoke<FocusSession>('start_focus', { taskId }),
   stopFocus: (id: string) => invoke<FocusSession>('stop_focus', { id }),

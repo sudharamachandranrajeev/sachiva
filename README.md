@@ -31,6 +31,7 @@ warns you if something you type looks like a health number, phone number, birth 
 
 ## ✨ What it does
 
+- 🗓️ **Import a calendar** – review events and dated tasks from an .ics file before adding them, with duplicate detection and confidentiality warnings.
 - ⏱️ **Focus and time log** – start a timer on a job, stop it when finished, and review recorded sessions on the dashboard. The timer keeps running if the app closes.
 - 📝 **Create from a note** – paste a message, review its suggested title, deadline and priority, then add it. The original note stays with the job; extraction runs offline.
 - 🚦 **Priority and local suggestions** – change priority directly on a job; add levels and arrange them in the order you choose. By default Very high ranks above High and Extremely high above both. Sachiva can suggest a priority from similar jobs you reprioritised locally, for you to review.
@@ -371,6 +372,6 @@ The Arch package is built from [packaging/arch/PKGBUILD](packaging/arch/PKGBUILD
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Calendar import uses [ical.js 2.2.1](https://github.com/kewisch/ical.js/tree/v2.2.1), licensed under [MPL 2.0](app/src/lib/licenses/ical-js-MPL-2.0.txt).
 
 > GitHub [@sudharamachandranrajeev](https://github.com/sudharamachandranrajeev)
