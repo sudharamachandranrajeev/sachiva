@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0]
+
+Efficiency tools, custom priorities and Blue glass (alpha). Updating preserves existing data and backs it up first.
 
 - Add the Blue glass theme, selectable accent colours, and independently combinable raised depth, shadows and glow. Existing light, dark and system settings remain available.
 
