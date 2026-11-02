@@ -5,6 +5,7 @@
 
 mod clinic;
 mod data;
+mod focus;
 mod targets;
 mod update;
 mod work;
@@ -599,6 +600,9 @@ pub fn run() {
             recovery_saved,
             unlock_with,
             get_dashboard,
+            focus::focus_sessions,
+            focus::start_focus,
+            focus::stop_focus,
             done_tasks,
             new_task,
             save_task,

@@ -141,7 +141,7 @@
       {@const s = chosen.summary}
       <p class="hint">
         It holds {s.openJobs} open {s.openJobs === 1 ? 'job' : 'jobs'}, {s.doneJobs} done and {s.trashed} in the trash.
-        Clinic records: {s.clinicEntries ?? 0} references and {s.clinicSlots ?? 0} cancelled slots; {s.templates ?? 0} templates.
+        Clinic records: {s.clinicEntries ?? 0} references and {s.clinicSlots ?? 0} cancelled slots; {s.templates ?? 0} templates; {s.focusSessions ?? 0} focus sessions.
         Last change: {when(s.lastChange)}.
       </p>
       <p class="hint">

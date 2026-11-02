@@ -57,6 +57,8 @@ export interface Task {
 
 export type Lane = 'overdue' | 'today' | 'waiting' | 'later'
 
+export interface FocusSession { id: string; taskId: string; title: string; startedAt: string; endedAt: string | null }
+
 export interface Item {
   task: Task
   score: number
@@ -140,6 +142,7 @@ export interface BackupSummary {
   clinicEntries: number
   clinicSlots: number
   templates: number
+  focusSessions: number
   lastChange: string | null
 }
 
@@ -365,6 +368,9 @@ export const api = {
   recoverySaved: () => invoke<void>('recovery_saved'),
   unlockWith: (recovery: string) => invoke<void>('unlock_with', { recovery }),
   dashboard: () => invoke<Dashboard>('get_dashboard'),
+  focusSessions: () => invoke<FocusSession[]>('focus_sessions'),
+  startFocus: (taskId: string) => invoke<FocusSession>('start_focus', { taskId }),
+  stopFocus: (id: string) => invoke<FocusSession>('stop_focus', { id }),
   doneTasks: () => invoke<Task[]>('done_tasks'),
   newTask: (title: string) => invoke<Task>('new_task', { title }),
   saveTask: (task: Task) => invoke<Task>('save_task', { task }),

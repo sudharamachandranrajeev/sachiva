@@ -31,6 +31,7 @@ warns you if something you type looks like a health number, phone number, birth 
 
 ## ✨ What it does
 
+- ⏱️ **Focus and time log** – start a timer on a job, stop it when finished, and review recorded sessions on the dashboard. The timer keeps running if the app closes.
 - 📝 **Create from a note** – paste a message, review its suggested title, deadline and priority, then add it. The original note stays with the job; extraction runs offline.
 - 🎯 **Do this now** – one card shows the job to do next, with a score and the reason, such as "Due in 3 h,
   needs about 30 min, marked important."

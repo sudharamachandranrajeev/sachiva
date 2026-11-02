@@ -6,6 +6,7 @@
   import { prefs } from './prefs.svelte'
   import { greeting, longDate } from './time'
   import Counters from './Counters.svelte'
+  import Focus from './Focus.svelte'
   import ClinicSummary from './ClinicSummary.svelte'
   import ScoreRing from './ScoreRing.svelte'
   import TaskRow from './TaskRow.svelte'
@@ -98,6 +99,7 @@
               onclick={() => app.act(() => api.snooze(n.task.id, 60), 'Reminders quiet for an hour.')}>I'm on it</button
             >
             <button class="btn" onclick={() => app.edit(n.task)}>Open</button>
+            {#if !app.focusSessions.some((s) => !s.endedAt)}<button class="btn" onclick={() => app.act(() => api.startFocus(n.task.id), 'Focus started.')}>Start focus</button>{/if}
           </div>
         </div>
       {/key}
@@ -109,6 +111,7 @@
       </div>
     {/if}
 
+    <Focus />
     <Counters counters={app.counters} />
     <ClinicSummary />
 

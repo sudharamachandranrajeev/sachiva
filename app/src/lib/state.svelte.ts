@@ -1,6 +1,6 @@
 // What the whole UI shares: the dashboard, the open editor, the message bar.
 
-import { api, message, type AppStatus, type Counter, type Dashboard, type Task } from './api'
+import { api, message, type AppStatus, type Counter, type Dashboard, type FocusSession, type Task } from './api'
 
 export type View = 'dashboard' | 'tasks' | 'lists' | 'reports' | 'settings'
 
@@ -15,6 +15,7 @@ class AppState {
   dash = $state<Dashboard | null>(null)
   /** Open targets and tallies; the dashboard ranks only the other jobs. */
   counters = $state<Counter[]>([])
+  focusSessions = $state<FocusSession[]>([])
   view = $state<View>('dashboard')
   clinicTab = $state<'figures' | 'refill' | 'work'>('figures')
   editing = $state<{ task: Task; isNew: boolean } | null>(null)
@@ -31,7 +32,7 @@ class AppState {
   async refresh() {
     if (!this.status?.unlocked) return
     try {
-      ;[this.dash, this.counters] = await Promise.all([api.dashboard(), api.counters()])
+      ;[this.dash, this.counters, this.focusSessions] = await Promise.all([api.dashboard(), api.counters(), api.focusSessions()])
       this.version++
     } catch (e) {
       this.say(message(e), { error: true })

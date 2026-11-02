@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Focus timer and time log: start on an open job, stop to log time, and undo either action. Sessions survive a restart and are included in encrypted backups.
+
 - Quick capture can interpret shorthand such as “PO chase fri 2pm !high @site2” and lets you review it before saving.
 
 - Create a job from a pasted note: review suggested title, deadline and priority before saving. The original note is kept and checked for confidential information.

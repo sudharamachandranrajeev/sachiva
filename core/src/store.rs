@@ -18,6 +18,7 @@ use crate::recur;
 use crate::waitlist::{Figures, WaitList};
 
 mod clinic;
+pub mod focus;
 mod records;
 mod work;
 
@@ -69,6 +70,7 @@ pub struct Summary {
     pub clinic_entries: usize,
     pub clinic_slots: usize,
     pub templates: usize,
+    pub focus_sessions: usize,
     /// When a job was last changed, if any.
     pub last_change: Option<Timestamp>,
 }
@@ -125,6 +127,8 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE history ADD COLUMN before_updated_at INTEGER;
 ",
     "CREATE TABLE task_templates (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);",
+    "CREATE TABLE focus_sessions (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+     CREATE UNIQUE INDEX focus_one_active ON focus_sessions((1)) WHERE json_extract(json, '$.endedAt') IS NULL;",
 ];
 
 pub struct Store {
@@ -315,6 +319,9 @@ impl Store {
             "DELETE FROM counts WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)",
             [cut],
         )?;
+        // Focus records retain the task title, so purge them and their undo rows with the task.
+        tx.execute("DELETE FROM history WHERE entity = 'focus' AND task_id IN (SELECT id FROM focus_sessions WHERE json_extract(json, '$.taskId') IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?))", [cut])?;
+        tx.execute("DELETE FROM focus_sessions WHERE json_extract(json, '$.taskId') IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?)", [cut])?;
         let n = tx.execute("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?", [cut])?;
         tx.execute("DELETE FROM history WHERE at < ?", [cut])?;
         tx.commit()?;
@@ -497,12 +504,12 @@ impl Store {
     }
 
     /// Run one change in a transaction; all its rows share one undo group.
-    fn change(&mut self, f: impl FnOnce(&rusqlite::Transaction, i64) -> Result<()>) -> Result<()> {
+    fn change<T>(&mut self, f: impl FnOnce(&rusqlite::Transaction, i64) -> Result<T>) -> Result<T> {
         let tx = self.conn.transaction()?;
         let group: i64 = tx.query_row("SELECT coalesce(max(group_id), 0) + 1 FROM history", [], |r| r.get(0))?;
-        f(&tx, group)?;
+        let result = f(&tx, group)?;
         tx.commit()?;
-        Ok(())
+        Ok(result)
     }
 }
 
@@ -590,6 +597,7 @@ fn summarise(conn: &Connection) -> Result<Summary> {
         clinic_entries: 0,
         clinic_slots: 0,
         templates: 0,
+        focus_sessions: 0,
         last_change: None,
     };
     if schema >= 3 {
@@ -601,6 +609,11 @@ fn summarise(conn: &Connection) -> Result<Summary> {
     if schema >= 4 {
         sum.templates = conn.query_row("SELECT count(*) FROM task_templates", [], |r| r.get(0))?;
         let latest: Option<i64> = conn.query_row("SELECT max(updated_at) FROM task_templates", [], |r| r.get(0))?;
+        sum.last_change = sum.last_change.max(latest.map(ts));
+    }
+    if schema >= 5 {
+        sum.focus_sessions = conn.query_row("SELECT count(*) FROM focus_sessions", [], |r| r.get(0))?;
+        let latest: Option<i64> = conn.query_row("SELECT max(updated_at) FROM focus_sessions", [], |r| r.get(0))?;
         sum.last_change = sum.last_change.max(latest.map(ts));
     }
     for row in rows {
