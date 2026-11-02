@@ -55,7 +55,7 @@
 <div class="top">
   <div>
     <h1>Tasks</h1>
-    <div class="muted sub">Every job, highest score first.</div>
+    <div class="muted sub">Every job, in priority order.</div>
   </div>
   <button class="btn p" onclick={() => app.startNew()}>+ New job</button>
 </div>
