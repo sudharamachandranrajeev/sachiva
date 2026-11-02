@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import Timer from '@lucide/svelte/icons/timer'
   import { api } from './api'
   import { app } from './state.svelte'
   import { when } from './time'
@@ -21,7 +22,7 @@
 </script>
 
 <section class="card focus" aria-label="Focus timer and time log">
-  <h3>Focus</h3>
+  <h3><Timer size={16} aria-hidden="true" /> Focus</h3>
   {#if active}
     <p>Working on <b>{active.title}</b></p>
     <p class="elapsed">{duration(active.startedAt, clock)}</p>
@@ -42,7 +43,7 @@
 
 <style>
   .focus { padding: 16px 18px; margin-top: 14px; }
-  .focus h3 { margin-bottom: 8px; }
+  .focus h3 { margin-bottom: 8px; display: flex; align-items: center; gap: 7px; color: var(--accent); }
   .focus p { margin: 6px 0; }
   .elapsed { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .hint, li { font-size: 12px; }

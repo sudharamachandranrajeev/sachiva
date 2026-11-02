@@ -23,7 +23,8 @@
     font-weight: 600;
     position: relative;
     flex: none;
-    transition: background 0.4s;
+    box-shadow: 0 4px 14px rgba(20, 45, 70, .09);
+    transition: background .45s cubic-bezier(.2,.8,.2,1), transform .25s ease;
   }
   .ring::before {
     content: '';

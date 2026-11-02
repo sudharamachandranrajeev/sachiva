@@ -1,6 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { fly } from 'svelte/transition'
+  import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard'
+  import ListTodo from '@lucide/svelte/icons/list-todo'
+  import Hospital from '@lucide/svelte/icons/hospital'
+  import ChartNoAxesCombined from '@lucide/svelte/icons/chart-no-axes-combined'
+  import Settings2 from '@lucide/svelte/icons/settings-2'
+  import Plus from '@lucide/svelte/icons/plus'
+  import Undo2 from '@lucide/svelte/icons/undo-2'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import { api, message, onChanged, type AlarmAccess } from './lib/api'
   import { app, type View } from './lib/state.svelte'
   import { prefs } from './lib/prefs.svelte'
@@ -29,6 +37,7 @@
     ['reports', 'Reports'],
     ['settings', 'Settings'],
   ]
+  const navIcons = { dashboard: LayoutDashboard, tasks: ListTodo, lists: Hospital, reports: ChartNoAxesCombined, settings: Settings2 }
   const counts = $derived<Record<View, string>>({
     dashboard: '',
     tasks: app.dash ? String(app.dash.items.length + (app.dash.now ? 1 : 0) + app.counters.length) : '',
@@ -122,14 +131,17 @@
   <div class="shell">
     <nav class="rail" aria-label="Main">
       <div class="brand"><img src="/favicon.svg" alt="" width="26" height="26" />Sachiva</div>
+      <div class="rail-label">WORKSPACE</div>
       {#each nav as [id, name] (id)}
+        {@const NavIcon = navIcons[id]}
         <button class="nav" class:sel={app.view === id} aria-current={app.view === id ? 'page' : undefined} onclick={() => (app.view = id)}>
-          {name}<b>{counts[id]}</b>
+          <span class="nav-title"><NavIcon size={18} strokeWidth={1.8} aria-hidden="true" />{name}</span><b>{counts[id]}</b>
         </button>
       {/each}
       <div class="sp"></div>
-      <button class="capture" onclick={() => (app.capturing = true)} title="Quick capture (N)">+ Quick capture</button>
-      <button class="undo" onclick={() => app.undo()} title="Undo the last change (Ctrl+Z)">Undo last change</button>
+      <div class="privacy"><ShieldCheck size={15} aria-hidden="true" /> Private on this device</div>
+      <button class="capture" onclick={() => (app.capturing = true)} title="Quick capture (N)"><Plus size={18} aria-hidden="true" /> Quick capture</button>
+      <button class="undo" onclick={() => app.undo()} title="Undo the last change (Ctrl+Z)"><Undo2 size={15} aria-hidden="true" /> Undo last change</button>
     </nav>
 
     <main>
@@ -153,11 +165,12 @@
 
     <nav class="dock card" aria-label="Main">
       {#each nav as [id, name] (id)}
+        {@const NavIcon = navIcons[id]}
         <button class:sel={app.view === id} aria-current={app.view === id ? 'page' : undefined} onclick={() => (app.view = id)}
-          >{id === 'dashboard' ? 'Home' : name}</button
+          ><NavIcon size={18} strokeWidth={1.8} aria-hidden="true" /><span>{id === 'dashboard' ? 'Home' : name}</span></button
         >
       {/each}
-      <button class="fab" aria-label="Quick capture" onclick={() => (app.capturing = true)}>+</button>
+      <button class="fab" aria-label="Quick capture" onclick={() => (app.capturing = true)}><Plus size={24} aria-hidden="true" /></button>
     </nav>
   </div>
 
@@ -189,9 +202,9 @@
     min-height: 100vh;
   }
   .rail {
-    width: 220px;
+    width: 232px;
     flex: none;
-    padding: 22px 16px;
+    padding: 24px 16px;
     border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
@@ -221,18 +234,23 @@
     align-items: center;
     gap: 10px;
   }
+  .rail-label { padding: 10px 12px 5px; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--muted); }
+  .nav-title { display: inline-flex; align-items: center; gap: 11px; }
+  .privacy { display: flex; align-items: center; gap: 8px; padding: 12px; color: var(--muted); font-size: 11px; }
   .nav {
-    padding: 9px 10px;
+    padding: 11px 12px;
     border-radius: 10px;
     color: var(--muted);
     font-size: 14px;
     display: flex;
     justify-content: space-between;
     text-align: left;
-    transition: background-color 0.15s;
+    align-items: center;
+    transition: background-color .22s ease, color .22s ease, transform .22s ease;
   }
   .nav:hover {
     background: var(--panel);
+    transform: translateX(2px);
   }
   .nav.sel {
     background: var(--accent-soft);
@@ -253,12 +271,14 @@
     background: var(--accent);
     color: var(--on-accent);
     font-weight: 600;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
   }
   .undo {
     margin-top: 6px;
     padding: 8px;
     color: var(--muted);
     font-size: 13px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
   }
   main {
     flex: 1;
@@ -324,9 +344,11 @@
       z-index: 5;
     }
     .dock button {
-      font-size: 13px;
+      font-size: 10px;
       color: var(--muted);
-      padding: 8px 6px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      min-width: 44px; min-height: 44px;
+      padding: 5px 4px;
       border-radius: 14px;
     }
     .dock button.sel {

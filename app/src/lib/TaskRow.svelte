@@ -65,15 +65,18 @@
     padding: 10px 12px;
     margin-bottom: 8px;
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr) auto auto auto;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    grid-template-areas: "tick body score" ". priority focus";
     gap: 10px;
     align-items: start;
     border-radius: 14px;
-    transition: border-color 0.15s, transform 0.15s;
+    transition: border-color .22s ease, transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease;
   }
-  .task:hover {
-    border-color: var(--accent);
-  }
+  @media (hover: hover) { .task:hover { border-color: var(--accent); transform: translateY(-2px); } }
+  .tick, .dot { grid-area: tick; }
+  .priority { grid-area: priority; }
+  .focus-btn { grid-area: focus; }
+  .s { grid-area: score; }
   .tick {
     width: 18px;
     height: 18px;
@@ -103,6 +106,7 @@
     background: var(--ok);
   }
   .body {
+    grid-area: body;
     text-align: left;
     display: flex;
     flex-direction: column;
@@ -128,7 +132,6 @@
   .why {
     font-style: italic;
   }
-  @media (max-width: 600px) { .task { grid-template-columns: 20px minmax(0, 1fr) auto auto; } .priority { grid-column: 2; } }
   .focus-btn { font-size: 12px; padding: 3px 7px; }
   .s {
     font-size: 12px;

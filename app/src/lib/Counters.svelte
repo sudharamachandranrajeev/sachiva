@@ -168,6 +168,7 @@
     display: block;
     height: 100%;
     background: var(--accent);
+    transition: width .45s cubic-bezier(.2,.8,.2,1), background-color .2s ease;
   }
   .behind .bar span {
     background: var(--warn);

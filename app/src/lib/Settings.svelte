@@ -8,6 +8,7 @@
   import BackupsPanel from './BackupsPanel.svelte'
   import UpdatesPanel from './UpdatesPanel.svelte'
   import icalLicense from './licenses/ical-js-MPL-2.0.txt?raw'
+  import lucideLicense from './licenses/lucide-ISC.txt?raw'
 
   let { alarms, onAlarms }: { alarms: AlarmAccess | null; onAlarms: () => void } = $props()
 
@@ -211,7 +212,7 @@
 <section class="card">
   <h2>About</h2>
   <p class="muted">Sachiva {version}. Free and open source under the MIT licence.</p>
-  <details><summary>Third-party licences</summary><p>Calendar import uses ical.js 2.2.1, licensed under MPL 2.0. Source: https://github.com/kewisch/ical.js/tree/v2.2.1</p><pre class="license">{icalLicense}</pre></details>
+  <details><summary>Third-party licences</summary><p>Calendar import uses ical.js 2.2.1, licensed under MPL 2.0. Source: https://github.com/kewisch/ical.js/tree/v2.2.1</p><pre class="license">{icalLicense}</pre><p>Icons use Lucide, licensed under ISC.</p><pre class="license">{lucideLicense}</pre></details>
   {#if autostart !== null}
     <label class="check-row">
       <input type="checkbox" checked={autostart} onchange={(e) => setAutostart(e.currentTarget.checked)} />

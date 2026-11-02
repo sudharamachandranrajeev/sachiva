@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.5.0]
+
+- Refreshed the dashboard and navigation with icons, gradients, and fluid transitions across themes.
+- Improved task layout on narrow screens and retained reduced-motion support.
+
 ## [0.4.0]
 
 Efficiency tools, custom priorities and Blue glass (alpha). Updating preserves existing data and backs it up first.

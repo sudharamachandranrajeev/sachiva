@@ -1,5 +1,7 @@
 <script lang="ts">
   import { flip } from 'svelte/animate'
+  import Plus from '@lucide/svelte/icons/plus'
+  import CalendarPlus from '@lucide/svelte/icons/calendar-plus'
   import { api, message, type Item, type Lane, type Task, type Trashed } from './api'
   import { app } from './state.svelte'
   import { prefs } from './prefs.svelte'
@@ -57,7 +59,7 @@
     <h1>Tasks</h1>
     <div class="muted sub">Every job, in priority order.</div>
   </div>
-  <div><button class="btn" onclick={() => (app.importingCalendar = true)}>Import calendar</button> <button class="btn p" onclick={() => app.startNew()}>+ New job</button></div>
+  <div class="actions"><button class="btn" onclick={() => (app.importingCalendar = true)}><CalendarPlus size={16} aria-hidden="true" /> Import calendar</button><button class="btn p" onclick={() => app.startNew()}><Plus size={16} aria-hidden="true" /> New job</button></div>
 </div>
 
 <div class="tabs" role="tablist">
@@ -146,6 +148,7 @@
 </details>
 
 <style>
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .top {
     display: flex;
     align-items: end;

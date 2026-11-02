@@ -168,7 +168,7 @@ button {
 h1 {
   font-size: 26px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.035em;
 }
 
 h2 {
@@ -189,17 +189,22 @@ h3 {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--r);
+  background-image: linear-gradient(145deg, rgba(255,255,255,.08), transparent 70%);
   box-shadow: var(--shadow), var(--effect-depth), var(--effect-shadow), var(--effect-glow);
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 8px 14px;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
   border: 1px solid var(--line);
   background: var(--panel2);
-  transition: background-color 0.15s, transform 0.1s;
+  transition: background-color .22s ease, border-color .22s ease, transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease;
   white-space: nowrap;
   box-shadow: var(--effect-depth), var(--effect-shadow), var(--effect-glow);
 }
@@ -216,6 +221,7 @@ h3 {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
+  background-image: linear-gradient(140deg, rgba(255,255,255,.12), transparent 62%);
 }
 
 .btn.danger {
@@ -240,6 +246,11 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel2);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  border-color: var(--accent);
 }
 
 textarea {
