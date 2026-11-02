@@ -23,3 +23,19 @@ test('handles notes without dates and respects explicit normal priority', () => 
   assert.equal(d.due, null)
   assert.equal(d.importance, 'normal')
 })
+
+test('quick capture extracts shorthand without losing the task title', async () => {
+  const { draftFromQuick } = await import('./noteCapture.ts')
+  const d = draftFromQuick('PO chase fri 2pm !high @site2', now)
+  assert.equal(d.title, 'PO chase')
+  assert.equal(d.site, 'site2')
+  assert.equal(d.importance, 'high')
+  assert.equal(new Date(d.due).getHours(), 14)
+})
+test('quick capture does not treat email addresses as sites', async () => {
+  const { draftFromQuick } = await import('./noteCapture.ts')
+  const d = draftFromQuick('Reply to person@example.com !low', now)
+  assert.equal(d.site, '')
+  assert.equal(d.title, 'Reply to person@example.com')
+  assert.equal(d.importance, 'low')
+})

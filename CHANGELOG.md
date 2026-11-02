@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Quick capture can interpret shorthand such as “PO chase fri 2pm !high @site2” and lets you review it before saving.
+
 - Create a job from a pasted note: review suggested title, deadline and priority before saving. The original note is kept and checked for confidential information.
 
 ## [0.3.0]

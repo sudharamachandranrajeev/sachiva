@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import { api, message, type Finding } from './api'
   import { app } from './state.svelte'
-  import { draftFromNote } from './noteCapture'
+  import { draftFromNote, draftFromQuick } from './noteCapture'
   import { fromInput, toInput } from './time'
   import type { Importance } from './api'
 
@@ -16,6 +16,7 @@
   let draftTitle = $state('')
   let due = $state<string | null>(null)
   let importance = $state<Importance>('normal')
+  let site = $state('')
   let assumedTime = $state(false)
   let busy = $state(false)
 
@@ -30,9 +31,12 @@
     return () => clearTimeout(h)
   })
 
-  async function preview() {
+  async function preview(quick = false) {
+    if (quick) { note = title; noteMode = true }
     const source = note
-    const draft = draftFromNote(source)
+    const quickDraft = quick ? draftFromQuick(source) : null
+    const draft = quickDraft ?? draftFromNote(source)
+    site = quickDraft?.site ?? ''
     draftTitle = draft.title
     due = draft.due
     importance = draft.importance
@@ -47,7 +51,7 @@
 
   $effect(() => {
     if (!noteMode || !reviewed) return
-    const text = `${note}\n${draftTitle}`
+    const text = `${note}\n${draftTitle}\n${site}`
     let active = true
     const h = setTimeout(async () => {
       try { const checked = await api.check(text); if (active) findings = checked } catch (e) { if (active) app.say(message(e), { error: true }) }
@@ -63,6 +67,7 @@
       task.notes = note.trim()
       task.due = due
       task.importance = importance
+      task.site = site.trim()
       const saved = await api.saveTask(task)
       await app.refresh()
       app.view = 'dashboard'
@@ -99,13 +104,14 @@
     <label for="capture-note">Paste a note or message</label>
     <textarea id="capture-note" bind:value={note} maxlength="20000" rows="6" placeholder="Subject: Order supplies&#10;Deadline: Friday 2pm&#10;Priority: high&#10;Details…" oninput={() => { reviewed = false; findings = [] }}></textarea>
     <p class="muted hint">Processed on this device. Use reference codes, not patient details.</p>
-    <button class="btn" onclick={preview} disabled={!note.trim()}>Extract details</button>
+    <button class="btn" onclick={() => preview()} disabled={!note.trim()}>Extract details</button>
     {#if reviewed}
       <div class="preview">
         <p>Review the suggested details before adding the job. The full note is kept in its notes.</p>
         <label>Title <input bind:value={draftTitle} maxlength="300" /></label>
         <label>Deadline <input type="datetime-local" value={toInput(due)} onchange={(e) => { due = fromInput(e.currentTarget.value); assumedTime = false }} /></label>
         {#if assumedTime}<p class="muted hint">No time was given; 17:00 is suggested. Please check it.</p>{/if}
+        <label>Site <input bind:value={site} maxlength="300" placeholder="Optional" /></label>
         <label>Priority <select bind:value={importance}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>
       </div>
       {#if findings.length}<div class="check" role="status">{#each findings as f, i (i)}<div>“{f.text}”. {f.message}</div>{/each}</div>{/if}
@@ -132,6 +138,7 @@
   {/if}
   <div class="row">
     <span class="muted">Enter adds it. Shift + Enter adds it and opens the details.</span>
+    <button class="btn" onclick={() => preview(true)} disabled={!title.trim()}>Interpret &amp; review</button>
     <button class="btn" onclick={() => add(true)} disabled={!title.trim()}>Add with details</button>
     <button class="btn p" onclick={() => add(false)} disabled={!title.trim()}>Add</button>
   </div>

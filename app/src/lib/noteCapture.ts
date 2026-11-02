@@ -32,3 +32,17 @@ export function draftFromNote(note: string, now = new Date()): NoteDraft {
   }
   return { title, due, importance, dateHadTime }
 }
+
+/** Parse the explicit shorthand used by quick capture; always review before saving. */
+export function draftFromQuick(text: string, now = new Date()): NoteDraft & { site: string } {
+  const parsed = draftFromNote(text, now)
+  const date = chrono.en.GB.parse(text, now, { forwardDate: true })[0]
+  const site = text.match(/(?:^|\s)@([\p{L}\p{N}_-]+)/u)?.[1] ?? ''
+  const priority = text.match(/(?:^|\s)!(high|normal|low)\b/i)?.[1]?.toLowerCase() as Importance | undefined
+  let title = text
+  if (date) title = title.slice(0, date.index) + ' ' + title.slice(date.index + date.text.length)
+  title = title.replace(/(?:^|\s)!(?:high|normal|low)\b/gi, ' ')
+    .replace(/(?:^|\s)@[\p{L}\p{N}_-]+/gu, ' ')
+    .replace(/\s+/g, ' ').trim()
+  return { ...parsed, title: Array.from(title).slice(0, 300).join(''), site, importance: priority ?? parsed.importance }
+}
