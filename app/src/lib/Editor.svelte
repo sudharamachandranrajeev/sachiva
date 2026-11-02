@@ -3,6 +3,7 @@
   import { api, message, type Finding, type Kind, type Repeat, type Span, type Task, type Weekday } from './api'
   import { app } from './state.svelte'
   import { fromInput, minutesToTomorrowMorning, toInput, when } from './time'
+  import WorkflowFields from './WorkflowFields.svelte'
 
   let { task: initial, isNew }: { task: Task; isNew: boolean } = $props()
 
@@ -56,6 +57,7 @@
 
   onMount(() => {
     dialog.showModal()
+    if (isNew && t.title.trim()) void save()
   })
 
   let first = true
@@ -111,6 +113,8 @@
       ...t.checklist.map((c, i): [string, string] => [`Checklist item ${i + 1}`, c.text]),
     ]
     if (t.status.state === 'waiting') fields.push(['Waiting on', t.status.on])
+    if (t.workflow?.type === 'procurement') fields.push(['Supplier',t.workflow.supplier],['Quote',t.workflow.quoteRef],['PO',t.workflow.poRef],['Invoice',t.workflow.invoiceRef])
+    if (t.workflow?.type === 'delivery') fields.push(['Receiver',t.workflow.receiver])
     const h = setTimeout(async () => {
       try {
         const found = await Promise.all(
@@ -209,6 +213,7 @@
       />
     </label>
 
+    {#if t.workflow}<WorkflowFields bind:task={t} {stored} />{:else}
     <div class="field-group">
       <label class="field">
         Type of job
@@ -262,6 +267,7 @@
       {/if}
     </div>
 
+    {/if}
     {#if findings.length}
       <div class="check" role="status">
         <b>Check before you keep this.</b> Sachiva is for reference codes, not patient details.
@@ -277,16 +283,16 @@
 
     <div class="row2">
       <label class="field">
-        Due by
+        {t.workflow?.type === 'procurement' ? 'Chase on' : 'Due by'}
         <input type="datetime-local" bind:value={() => toInput(t.due), (v) => (t.due = fromInput(v))} />
       </label>
-      <label class="field">
-        Appointment time
+      {#if t.workflow?.type !== 'procurement'}<label class="field">
+        {t.workflow?.type === 'delivery' ? 'Delivery window starts' : 'Appointment time'}
         <input
           type="datetime-local"
           bind:value={() => toInput(t.appointment), (v) => (t.appointment = fromInput(v))}
         />
-      </label>
+      </label>{/if}
     </div>
 
     <div class="row2">
@@ -322,7 +328,7 @@
     <div class="row2">
       <label class="field">
         Site
-        <input bind:value={t.site} list="sites" maxlength="300" placeholder="e.g. Site A" />
+        <input bind:value={t.site} readonly={t.workflow?.type === 'session'} list="sites" maxlength="300" placeholder="e.g. Site A" />
         <datalist id="sites">{#each app.sites as s (s)}<option value={s}></option>{/each}</datalist>
       </label>
       <label class="field">
@@ -331,6 +337,7 @@
       </label>
     </div>
 
+    {#if !t.workflow}
     <div class="field-group">
       <span class="label">Status</span>
       <div class="seg" role="radiogroup" aria-label="Status">
@@ -364,6 +371,7 @@
       {/if}
     </div>
 
+    {/if}
     <label class="check-row">
       <input type="checkbox" bind:checked={t.pinned} />
       Pin to the top of Today
@@ -389,7 +397,7 @@
       </div>
     </div>
 
-    {#if !counter}
+    {#if !counter && !t.workflow}
     <div class="field-group">
       <span class="label">Repeat</span>
       <select value={t.repeat?.kind ?? 'none'} onchange={(e) => setRepeat(e.currentTarget.value)} aria-label="Repeat">
@@ -448,7 +456,7 @@
   <footer>
     <button class="btn danger" onclick={remove}>{stored ? 'Delete' : 'Discard'}</button>
     <span class="sp"></span>
-    <button class="btn p" disabled={!t.title.trim()} onclick={done}>Mark done</button>
+    <button class="btn p" disabled={!t.title.trim() || (t.workflow?.type === 'procurement' && t.workflow.stage !== 'invoice') || (t.workflow?.type === 'delivery' && !t.workflow.confirmedAt)} onclick={done}>Mark done</button>
   </footer>
 </dialog>
 

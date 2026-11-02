@@ -43,6 +43,8 @@ warns you if something you type looks like a health number, phone number, birth 
   when you fall behind. Or just count: calls, bookings, work-queue items sorted. Press **+1** as you go.
 - 📋 **Waiting lists** – enter each list's figures daily, weekly or monthly: how many wait, joined, left and
   were booked, how long they wait (in bands), and the longest wait. Split by site, clinic and provider.
+- 🏥 **Cancelled slots** – keep waiting reference codes, see who fits a freed appointment,
+  log calls, and record filled or lost slots. See [the clinic desk guide](docs/clinic-desk.md).
 - 📊 **Reports** – charts in the "Making Data Count" style used across health services, which show real
   change apart from ordinary ups and downs. Save them as a spreadsheet (.xlsx), document (.docx), slides (.pptx) or PDF.
 - 🛡️ **Confidentiality check** – warns, before you keep a job, if the text may identify a person.
@@ -204,7 +206,7 @@ flowchart LR
 
 **Keep waiting-list figures**
 
-1. Open **Waiting lists** and add a list, such as "Follow-ups, Clinic A".
+1. Open **Clinic → Waiting-list figures** and add a list, such as "Follow-ups, Clinic A".
 2. Under **About this list**, add the site, clinic and provider (initials or a role, never a name), the
    wait bands in weeks (for example `9, 18, 52`) and, if you have one, a target for the longest wait.
 3. Under **Figures**, pick **Day**, **Week** or **Month** and any day in that period, fill in what you

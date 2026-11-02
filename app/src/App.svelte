@@ -14,7 +14,7 @@
   import UpdateBanner from './lib/UpdateBanner.svelte'
   import { updates } from './lib/updates.svelte'
   import Tasks from './lib/Tasks.svelte'
-  import WaitingLists from './lib/WaitingLists.svelte'
+  import ClinicDesk from './lib/ClinicDesk.svelte'
 
   let now = $state(new Date())
   let alarms = $state<AlarmAccess | null>(null)
@@ -23,7 +23,7 @@
   const nav: [View, string][] = [
     ['dashboard', 'Dashboard'],
     ['tasks', 'Tasks'],
-    ['lists', 'Waiting lists'],
+    ['lists', 'Clinic'],
     ['reports', 'Reports'],
     ['settings', 'Settings'],
   ]
@@ -139,7 +139,7 @@
           {:else if app.view === 'tasks'}
             <Tasks />
           {:else if app.view === 'lists'}
-            <WaitingLists />
+            <ClinicDesk />
           {:else if app.view === 'reports'}
             <Reports />
           {:else}
@@ -152,7 +152,7 @@
     <nav class="dock card" aria-label="Main">
       {#each nav as [id, name] (id)}
         <button class:sel={app.view === id} aria-current={app.view === id ? 'page' : undefined} onclick={() => (app.view = id)}
-          >{id === 'lists' ? 'Lists' : id === 'dashboard' ? 'Home' : name}</button
+          >{id === 'dashboard' ? 'Home' : name}</button
         >
       {/each}
       <button class="fab" aria-label="Quick capture" onclick={() => (app.capturing = true)}>+</button>

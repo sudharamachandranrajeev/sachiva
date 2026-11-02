@@ -8,9 +8,26 @@ import demo from './demo.json'
 const p = new URLSearchParams(location.hash.slice(1))
 if (p.get('theme')) localStorage.setItem('sachiva.theme', p.get('theme')!)
 const mode = p.get('mode') ?? 'ok'
+const clinicEntry = { id: '0192f0c4-0000-7000-8000-000000000011', listId: demo.waitlists[0].id,
+  reference: 'REF-A17', target: '2026-11-05', appointmentType: 'Review', minutes: 30,
+  days: [], earliest: null, latest: null, state: { state: 'waiting' }, revision: 1,
+  createdAt: '2026-10-30T09:00:00Z', updatedAt: '2026-10-30T09:00:00Z' }
+const clinicSlot = { id: '0192f0c4-0000-7000-8000-000000000012', listId: clinicEntry.listId,
+  start: '2026-11-04T10:30:00Z', minutes: 30, appointmentType: 'Review', state: { state: 'open' },
+  contacts: [], revision: 1, createdAt: '2026-10-30T09:00:00Z', updatedAt: '2026-10-30T09:00:00Z' }
+const clinicSummary = { open: 1, filled: 0, lost: 0, refillPercent: null, meanFillMinutes: null }
+const workJobs = [
+  { ...demo.dashboard.items[0].task, id:'0192f0c4-0000-7000-8000-000000000021', title:'Clinic A morning session', kind:{type:'appointment'}, status:{state:'open'}, appointment:'2026-11-04T09:00:00Z', workflow:{type:'session',listId:clinicEntry.listId,minutes:180,cancelled:false} },
+  { ...demo.dashboard.items[0].task, id:'0192f0c4-0000-7000-8000-000000000022', title:'Order sterile packs', kind:{type:'deadline'}, status:{state:'open'}, appointment:null, due:'2026-11-04T12:00:00Z', workflow:{type:'procurement',stage:'partial',supplier:'Supplier A',quoteRef:'Q-17',poRef:'PO-17',quantity:20,received:8,expected:'2026-11-05T10:00:00Z',invoiceRef:''} },
+  { ...demo.dashboard.items[0].task, id:'0192f0c4-0000-7000-8000-000000000023', title:'Receive stock delivery', kind:{type:'appointment'}, status:{state:'open'}, appointment:'2026-11-05T09:00:00Z', workflow:{type:'delivery',windowEnd:'2026-11-05T12:00:00Z',receiver:'Stores role',confirmedAt:null} },
+]
 
 mockIPC((cmd, args: any) => {
   switch (cmd) {
+    case 'work_data': return { tasks:workJobs, lists:demo.waitlists, templates:[{id:'0192f0c4-0000-7000-8000-000000000024',name:'Clinic setup',task:workJobs[0],archived:false,revision:1}] }
+    case 'clinic_data': return { lists: demo.waitlists, entries: [clinicEntry], slots: [clinicSlot], summary: clinicSummary }
+    case 'clinic_summary': return clinicSummary
+    case 'clinic_candidates': return [{ entry: clinicEntry, why: 'Target 2026-11-05; same site, clinic and provider; length, type and preferred times fit.' }]
     case 'status':
       return { unlocked: mode !== 'locked', problem: mode === 'locked' ? 'The stored database key cannot be read.' : null,
         recoveryPending: mode === 'first', keyStorage: 'keyring', platform: p.get('platform') ?? 'linux',
@@ -54,6 +71,13 @@ await import('../src/main.ts')
 const { app } = await import('../src/lib/state.svelte.ts')
 await new Promise((r) => setTimeout(r, 300))
 if (p.get('view')) app.view = p.get('view') as any
+if (p.get('work')) {app.view='lists';app.clinicTab='work'}
+if (p.get('workedit')) app.editing={task:structuredClone(workJobs.find(t=>t.workflow.type===p.get('workedit'))!) as any,isNew:false}
+if (p.get('clinic')) {
+  app.clinicTab = 'refill'
+  await new Promise((r) => setTimeout(r, 300))
+  document.querySelector<HTMLButtonElement>('button.slot')?.click()
+}
 if (p.get('edit')) {
   const t = structuredClone(demo.dashboard.items[0].task)
   t.notes = 'Offer to next on list. Was 943 476 5919 on the old sheet.'

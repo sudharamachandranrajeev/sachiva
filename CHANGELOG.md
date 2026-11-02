@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0]
+
+Clinic workflows (alpha). Updating keeps your jobs and backs up first.
+
+- Clinic desk: log cancelled slots, match waiting reference codes by target date,
+  site/clinic/provider list, appointment type, duration and preferred days/times.
+- Record calls, confirm a booking before filling a slot, or mark it lost. Filling
+  and booking the reference are atomic; every clinic change can be undone.
+- Open slots use the existing reminder rules until their start time. Dashboard
+  shows open/filled/lost counts, refill rate and average time to fill.
+- Encrypted backups include clinic records, and restore previews show their counts.
+  Existing jobs, waiting-list figures and undo history migrate unchanged.
+- Clinic sessions, procurement, delivery confirmation, and reusable task templates.
+- Android: keep screens, dialogs and fixed controls clear of the status bar,
+  navigation bar and keyboard, including three-button navigation.
+- Android: fix startup hanging on "Opening…" when notification permission
+  has already been granted.
+
 ## [0.2.0]
 
 Targets, tallies, waiting lists and reports (alpha). Updating keeps your jobs; Sachiva backs up first.

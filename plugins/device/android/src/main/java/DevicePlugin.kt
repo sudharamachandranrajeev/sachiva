@@ -12,7 +12,11 @@ import android.provider.Settings
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.view.View
+import android.webkit.WebView
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
@@ -52,6 +56,23 @@ class KeyArgs {
 // that never leaves the Android Keystore.
 @TauriPlugin
 class DevicePlugin(private val activity: Activity) : Plugin(activity) {
+    override fun load(webView: WebView) {
+        // Edge-to-edge is required on newer Android versions. Fit the whole
+        // WebView inside system bars, cutouts and the keyboard, including HTML
+        // dialogs and fixed controls; WebView's CSS safe-area values can be zero.
+        val content = activity.findViewById<View>(android.R.id.content)
+        ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+            val safe = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout() or
+                    WindowInsetsCompat.Type.ime()
+            )
+            view.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+        ViewCompat.requestApplyInsets(content)
+    }
+
     private val prefs = activity.getSharedPreferences("sachiva-device", Context.MODE_PRIVATE)
     private val alias = "sachiva-db-wrap"
 

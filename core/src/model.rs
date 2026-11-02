@@ -101,6 +101,8 @@ pub struct Task {
     pub title: String,
     #[serde(default)]
     pub kind: Kind,
+    #[serde(default)]
+    pub workflow: Option<crate::work::Workflow>,
     /// What the counts are of, for reports: "Calls", "Bookings". Empty
     /// means the title is used.
     #[serde(default)]
@@ -139,6 +141,7 @@ impl Task {
             id: uuid::Uuid::now_v7().to_string(),
             title: title.into(),
             kind: Kind::Generic,
+            workflow: None,
             activity: String::new(),
             notes: String::new(),
             due: None,
@@ -175,10 +178,19 @@ impl Task {
 
     /// The time that matters most: the appointment if earlier than the deadline.
     pub fn deadline(&self) -> Option<Timestamp> {
-        match (self.due, self.appointment) {
+        let deadline = match (self.due, self.appointment) {
             (Some(d), Some(a)) => Some(d.min(a)),
             (d, a) => d.or(a),
-        }
+        };
+        let expected = match &self.workflow {
+            Some(crate::work::Workflow::Procurement {
+                stage: crate::work::Stage::Ordered | crate::work::Stage::Partial,
+                expected,
+                ..
+            }) => *expected,
+            _ => None,
+        };
+        deadline.into_iter().chain(expected).min()
     }
 }
 
@@ -193,6 +205,9 @@ pub const MAX_GOAL: u32 = 1_000_000;
 impl Task {
     /// Checks a task coming from the UI. Returns a message for the user.
     pub fn validate(&self) -> Result<(), String> {
+        if let Some(workflow) = &self.workflow {
+            workflow.validate(self)?;
+        }
         let title = self.title.trim();
         if title.is_empty() {
             return Err("Give the job a title.".into());

@@ -6,6 +6,7 @@
   import { prefs } from './prefs.svelte'
   import { greeting, longDate } from './time'
   import Counters from './Counters.svelte'
+  import ClinicSummary from './ClinicSummary.svelte'
   import ScoreRing from './ScoreRing.svelte'
   import TaskRow from './TaskRow.svelte'
 
@@ -109,6 +110,7 @@
     {/if}
 
     <Counters counters={app.counters} />
+    <ClinicSummary />
 
     <div class="lanes">
       {#each lanes as l (l.lane)}

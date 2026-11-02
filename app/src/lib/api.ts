@@ -36,6 +36,7 @@ export interface Task {
   id: string
   title: string
   kind: Kind
+  workflow?: Workflow | null
   /** Groups counts in the performance report; empty = the title. */
   activity: string
   notes: string
@@ -136,6 +137,9 @@ export interface BackupSummary {
   openJobs: number
   doneJobs: number
   trashed: number
+  clinicEntries: number
+  clinicSlots: number
+  templates: number
   lastChange: string | null
 }
 
@@ -311,7 +315,51 @@ export interface Preview {
   charts: string[][]
 }
 
+export interface ClinicEntry {
+  id: string; listId: string; reference: string; target: string; appointmentType: string; minutes: number
+  days: number[]; earliest: string | null; latest: string | null
+  state: { state: 'waiting' } | { state: 'archived' } | { state: 'booked'; slotId: string }
+  revision: number; createdAt: string; updatedAt: string
+}
+export type ContactOutcome = 'noAnswer' | 'declined' | 'callBack'
+export interface ClinicSlot {
+  id: string; listId: string; start: string; minutes: number; appointmentType: string
+  state: { state: 'open' } | { state: 'filled'; entryId: string; at: string } | { state: 'lost'; at: string }
+  contacts: { entryId: string; at: string; outcome: ContactOutcome; note: string }[]
+  revision: number; createdAt: string; updatedAt: string
+}
+export interface ClinicSummary {
+  open: number; filled: number; lost: number; refillPercent: number | null; meanFillMinutes: number | null
+}
+export interface ClinicData { lists: WaitList[]; entries: ClinicEntry[]; slots: ClinicSlot[]; summary: ClinicSummary }
+export interface ClinicCandidate { entry: ClinicEntry; why: string }
+
+export type WorkflowKind = 'session' | 'procurement' | 'delivery'
+export type ProcurementStage = 'request' | 'quote' | 'ordered' | 'partial' | 'received' | 'invoice'
+export type Workflow =
+  | { type: 'session'; listId: string; minutes: number; cancelled: boolean }
+  | { type: 'procurement'; stage: ProcurementStage; supplier: string; quoteRef: string; poRef: string; quantity: number; received: number; expected: string | null; invoiceRef: string }
+  | { type: 'delivery'; windowEnd: string | null; receiver: string; confirmedAt: string | null }
+export interface TaskTemplate { id: string; name: string; task: Task; archived: boolean; revision: number }
+export interface WorkData { tasks: Task[]; templates: TaskTemplate[]; lists: WaitList[] }
+
 export const api = {
+  workData: () => invoke<WorkData>('work_data'),
+  newWorkflowTask: (kind: WorkflowKind, listId: string | null) => invoke<Task>('new_workflow_task', { kind, listId }),
+  createTemplate: (taskId: string, name: string) => invoke<TaskTemplate>('create_template', { taskId, name }),
+  archiveTemplate: (id: string, revision: number, archived: boolean) => invoke<void>('archive_template', { id, revision, archived }),
+  taskFromTemplate: (id: string) => invoke<Task>('task_from_template', { id }),
+  confirmDelivery: (id: string) => invoke<void>('confirm_delivery', { id }),
+  cancelSession: (id: string) => invoke<void>('cancel_session', { id }),
+  clinicData: () => invoke<ClinicData>('clinic_data'),
+  clinicSummary: () => invoke<ClinicSummary>('clinic_summary'),
+  clinicCandidates: (slotId: string) => invoke<ClinicCandidate[]>('clinic_candidates', { slotId }),
+  newClinicEntry: (listId: string, reference: string, target: string) => invoke<ClinicEntry>('new_clinic_entry', { listId, reference, target }),
+  newClinicSlot: (listId: string, start: string) => invoke<ClinicSlot>('new_clinic_slot', { listId, start }),
+  saveClinicEntry: (entry: ClinicEntry) => invoke<ClinicEntry>('save_clinic_entry', { entry }),
+  saveClinicSlot: (slot: ClinicSlot) => invoke<ClinicSlot>('save_clinic_slot', { slot }),
+  contactClinicEntry: (slotId: string, revision: number, entryId: string, outcome: ContactOutcome, note: string) => invoke<void>('contact_clinic_entry', { slotId, revision, contact: { entryId, outcome, note } }),
+  closeClinicSlot: (slotId: string, revision: number, entryId: string | null) => invoke<void>('close_clinic_slot', { slotId, revision, entryId }),
   status: () => invoke<AppStatus>('status'),
   recoveryKey: () => invoke<string>('recovery_key'),
   recoverySaved: () => invoke<void>('recovery_saved'),

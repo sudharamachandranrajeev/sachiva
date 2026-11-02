@@ -17,6 +17,10 @@ use crate::model::{Kind, Span, Task};
 use crate::recur;
 use crate::waitlist::{Figures, WaitList};
 
+mod clinic;
+mod records;
+mod work;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("database: {0}")]
@@ -62,6 +66,9 @@ pub struct Summary {
     pub open_jobs: usize,
     pub done_jobs: usize,
     pub trashed: usize,
+    pub clinic_entries: usize,
+    pub clinic_slots: usize,
+    pub templates: usize,
     /// When a job was last changed, if any.
     pub last_change: Option<Timestamp>,
 }
@@ -111,6 +118,13 @@ const MIGRATIONS: &[&str] = &[
     );
     CREATE INDEX figures_period ON figures(list_id, span, start, seq);
 ",
+    "
+    CREATE TABLE clinic_entries (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+    CREATE TABLE clinic_slots (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+    ALTER TABLE history ADD COLUMN entity TEXT NOT NULL DEFAULT 'task';
+    ALTER TABLE history ADD COLUMN before_updated_at INTEGER;
+",
+    "CREATE TABLE task_templates (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);",
 ];
 
 pub struct Store {
@@ -254,11 +268,24 @@ impl Store {
         };
         {
             let mut st = tx.prepare(
-                "SELECT task_id, before_json, before_deleted_at FROM history WHERE group_id = ? ORDER BY seq DESC",
+                "SELECT task_id, before_json, before_deleted_at, entity, before_updated_at FROM history WHERE group_id = ? ORDER BY seq DESC",
             )?;
-            let rows: Vec<(String, Option<String>, Option<i64>)> =
-                st.query_map([group], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?;
-            for (id, before, deleted) in rows {
+            let rows = st
+                .query_map([group], |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        r.get::<_, Option<String>>(1)?,
+                        r.get::<_, Option<i64>>(2)?,
+                        r.get::<_, String>(3)?,
+                        r.get::<_, Option<i64>>(4)?,
+                    ))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            for (id, before, deleted, entity, updated) in rows {
+                if entity != "task" {
+                    records::undo_row(&tx, &entity, &id, before.as_deref(), updated)?;
+                    continue;
+                }
                 match before {
                     None => {
                         tx.execute("DELETE FROM tasks WHERE id = ?", [&id])?;
@@ -419,6 +446,12 @@ impl Store {
     pub fn save_waitlist(&mut self, list: &WaitList, now: Timestamp) -> Result<()> {
         list.validate().map_err(Error::Invalid)?;
         if let Ok(old) = self.waitlist(&list.id)
+            && (old.site != list.site || old.clinic != list.clinic || old.provider != list.provider)
+            && self.conn.query_row("SELECT EXISTS(SELECT 1 FROM clinic_entries WHERE json_extract(json,'$.listId')=?1 UNION ALL SELECT 1 FROM clinic_slots WHERE json_extract(json,'$.listId')=?1 UNION ALL SELECT 1 FROM tasks WHERE json_extract(json,'$.workflow.type')='session' AND json_extract(json,'$.workflow.listId')=?1)", [&list.id], |r|r.get::<_,bool>(0))?
+        {
+            return Err(Error::Invalid("This list has clinic records. Make a new list to change its site, clinic or provider.".into()));
+        }
+        if let Ok(old) = self.waitlist(&list.id)
             && old.bands != list.bands
         {
             let used: i64 =
@@ -474,6 +507,23 @@ impl Store {
 }
 
 fn put(tx: &rusqlite::Transaction, group: i64, task: &Task, label: &str, now: Timestamp) -> Result<()> {
+    task.validate().map_err(Error::Invalid)?;
+    let old: Option<String> = tx.query_row("SELECT json FROM tasks WHERE id=?", [&task.id], |r| r.get(0)).optional()?;
+    if let Some(old) = old.as_deref() {
+        crate::work::Workflow::check_change(&serde_json::from_str(old)?, task).map_err(Error::Invalid)?;
+    }
+    if let Some(crate::work::Workflow::Session { list_id, .. }) = &task.workflow {
+        let json: Option<String> =
+            tx.query_row("SELECT json FROM waitlists WHERE id=?", [list_id], |r| r.get(0)).optional()?;
+        let list: WaitList =
+            serde_json::from_str(&json.ok_or_else(|| Error::Invalid("Choose an existing clinic list.".into()))?)?;
+        if list.archived && old.is_none() {
+            return Err(Error::Invalid("Choose a clinic list that is not archived.".into()));
+        }
+        if task.site != list.site {
+            return Err(Error::Invalid("The session site must match its clinic list.".into()));
+        }
+    }
     record(tx, group, &task.id, label, now)?;
     tx.execute(
         "INSERT INTO tasks (id, json, updated_at, deleted_at) VALUES (?1, ?2, ?3, NULL)
@@ -532,7 +582,27 @@ fn summarise(conn: &Connection) -> Result<Summary> {
     let schema: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
     let mut st = conn.prepare("SELECT json, deleted_at FROM tasks")?;
     let rows = st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<i64>>(1)?)))?;
-    let mut sum = Summary { schema, open_jobs: 0, done_jobs: 0, trashed: 0, last_change: None };
+    let mut sum = Summary {
+        schema,
+        open_jobs: 0,
+        done_jobs: 0,
+        trashed: 0,
+        clinic_entries: 0,
+        clinic_slots: 0,
+        templates: 0,
+        last_change: None,
+    };
+    if schema >= 3 {
+        sum.clinic_entries = conn.query_row("SELECT count(*) FROM clinic_entries", [], |r| r.get(0))?;
+        sum.clinic_slots = conn.query_row("SELECT count(*) FROM clinic_slots", [], |r| r.get(0))?;
+        let latest: Option<i64> = conn.query_row("SELECT max(updated_at) FROM (SELECT updated_at FROM clinic_entries UNION ALL SELECT updated_at FROM clinic_slots)", [], |r|r.get(0))?;
+        sum.last_change = latest.map(ts);
+    }
+    if schema >= 4 {
+        sum.templates = conn.query_row("SELECT count(*) FROM task_templates", [], |r| r.get(0))?;
+        let latest: Option<i64> = conn.query_row("SELECT max(updated_at) FROM task_templates", [], |r| r.get(0))?;
+        sum.last_change = sum.last_change.max(latest.map(ts));
+    }
     for row in rows {
         let (json, deleted) = row?;
         let task: Task = serde_json::from_str(&json)?;

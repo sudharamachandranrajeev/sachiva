@@ -141,10 +141,11 @@
       {@const s = chosen.summary}
       <p class="hint">
         It holds {s.openJobs} open {s.openJobs === 1 ? 'job' : 'jobs'}, {s.doneJobs} done and {s.trashed} in the trash.
+        Clinic records: {s.clinicEntries ?? 0} references and {s.clinicSlots ?? 0} cancelled slots; {s.templates ?? 0} templates.
         Last change: {when(s.lastChange)}.
       </p>
       <p class="hint">
-        Restoring replaces all your current jobs with these. Your current data is backed up first, so you can undo this
+        Restoring replaces all your current data, including jobs and clinic records. Your current data is backed up first, so you can undo this
         by restoring that backup.
       </p>
       <div class="row">

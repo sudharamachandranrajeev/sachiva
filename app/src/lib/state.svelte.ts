@@ -16,6 +16,7 @@ class AppState {
   /** Open targets and tallies; the dashboard ranks only the other jobs. */
   counters = $state<Counter[]>([])
   view = $state<View>('dashboard')
+  clinicTab = $state<'figures' | 'refill' | 'work'>('figures')
   editing = $state<{ task: Task; isNew: boolean } | null>(null)
   capturing = $state(false)
   toast = $state<Toast | null>(null)

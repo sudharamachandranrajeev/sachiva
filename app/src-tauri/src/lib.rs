@@ -3,9 +3,11 @@
 //! it running so reminders arrive with the window closed; on Android the
 //! next few days of reminders are handed to the system as exact alarms.
 
+mod clinic;
 mod data;
 mod targets;
 mod update;
+mod work;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -241,6 +243,11 @@ fn reopen(app: AppHandle, state: State<App>, id: String) -> CommandResult<()> {
     state.with(|s| {
         let mut t = s.task(&id)?;
         t.status = Status::Open;
+        match &mut t.workflow {
+            Some(sachiva_core::work::Workflow::Session { cancelled, .. }) => *cancelled = false,
+            Some(sachiva_core::work::Workflow::Delivery { confirmed_at, .. }) => *confirmed_at = None,
+            _ => {}
+        }
         t.updated_at = now;
         s.save(&t, now)
     })?;
@@ -351,6 +358,7 @@ fn due_reminders(state: &App, from: Timestamp, to: Timestamp) -> Vec<Reminder> {
         .collect();
     // Targets are not ranked; behind-pace nudges come separately, the latest per target.
     let mut pace = targets::pace_reminders(state, from, to, &settings);
+    pace.extend(clinic::planned(state, from, to, &settings));
     pace.sort_by_key(|r| r.at);
     for r in pace.into_iter().rev() {
         if !due.iter().any(|d| d.task_id == r.task_id) {
@@ -397,6 +405,7 @@ fn schedule_alarms(app: &AppHandle) {
         })
         .collect();
     all.extend(targets::pace_reminders(&state, now, now + SignedDuration::from_hours(24 * DAYS), &settings));
+    all.extend(clinic::planned(&state, now, now + SignedDuration::from_hours(24 * DAYS), &settings));
     all.sort_by_key(|r| r.at);
     all.truncate(MAX);
 
@@ -425,7 +434,10 @@ fn schedule_alarms(app: &AppHandle) {
         }
     }
     // Alarms are planned only a few days ahead: a nudge to open the app keeps them going.
-    if tasks.iter().any(|t| !t.is_done())
+    let open_clinic_slot = state
+        .with(|s| Ok(s.clinic_slots()?.iter().any(|s| s.state == sachiva_core::clinic::SlotState::Open)))
+        .unwrap_or(false);
+    if (tasks.iter().any(|t| !t.is_done()) || open_clinic_slot)
         && let Some(date) = at(now + SignedDuration::from_hours(24 * DAYS - 2))
     {
         let id = 999;
@@ -557,7 +569,14 @@ pub fn run() {
             }
             #[cfg(mobile)]
             {
-                let _ = handle.notification().request_permission();
+                // Android's notification plugin leaves an already-granted request
+                // unresolved. Check first so reopening the app cannot stall setup.
+                if !matches!(
+                    handle.notification().permission_state(),
+                    Ok(tauri_plugin_notification::PermissionState::Granted)
+                ) {
+                    let _ = handle.notification().request_permission();
+                }
                 create_channels(&handle);
                 app.state::<App>().maintain();
                 schedule_alarms(&handle);
@@ -619,6 +638,22 @@ pub fn run() {
             targets::save_figures,
             targets::preview_report,
             targets::export_report,
+            clinic::clinic_data,
+            clinic::clinic_summary,
+            clinic::clinic_candidates,
+            clinic::new_clinic_entry,
+            clinic::new_clinic_slot,
+            clinic::save_clinic_entry,
+            clinic::save_clinic_slot,
+            clinic::contact_clinic_entry,
+            clinic::close_clinic_slot,
+            work::work_data,
+            work::new_workflow_task,
+            work::create_template,
+            work::archive_template,
+            work::task_from_template,
+            work::confirm_delivery,
+            work::cancel_session,
             alarm_access,
             open_alarm_settings,
             open_battery_settings,
