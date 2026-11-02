@@ -3,7 +3,8 @@
   import { getVersion } from '@tauri-apps/api/app'
   import { api, message, type AlarmAccess, type Page, type ReminderSettings } from './api'
   import { app, recentErrors } from './state.svelte'
-  import { prefs, type Motion, type Theme } from './prefs.svelte'
+  import { prefs } from './prefs.svelte'
+  import ThemeControls from './ThemeControls.svelte'
   import BackupsPanel from './BackupsPanel.svelte'
   import UpdatesPanel from './UpdatesPanel.svelte'
   import icalLicense from './licenses/ical-js-MPL-2.0.txt?raw'
@@ -164,25 +165,7 @@
 
 <section class="card">
   <h2>Look</h2>
-  <div class="grid">
-    <label class="field">
-      Colours
-      <select bind:value={prefs.theme} onchange={() => prefs.apply()}>
-        {#each [['system', 'Follow the system'], ['light', 'Light'], ['dark', 'Dark']] as [v, name] (v)}
-          <option value={v as Theme}>{name}</option>
-        {/each}
-      </select>
-    </label>
-    <label class="field">
-      Movement
-      <select bind:value={prefs.motion} onchange={() => prefs.apply()}>
-        {#each [['system', 'Follow the system'], ['reduced', 'Calm: as little as possible'], ['full', 'Full']] as [v, name] (v)}
-          <option value={v as Motion}>{name}</option>
-        {/each}
-      </select>
-    </label>
-  </div>
-  <p class="hint">These are kept on this device only.</p>
+  <ThemeControls />
 </section>
 
 <section class="card">

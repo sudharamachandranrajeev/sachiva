@@ -1,7 +1,8 @@
 // Look-and-feel choices for this device. Kept in localStorage: losing them
 // costs nothing, so they do not belong in the encrypted store.
 
-export type Theme = 'system' | 'light' | 'dark'
+export type Theme = 'system' | 'light' | 'dark' | 'glass'
+export type Accent = 'theme' | 'ocean' | 'violet' | 'teal'
 export type Motion = 'system' | 'reduced' | 'full'
 
 function read<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
@@ -24,8 +25,12 @@ function write(key: string, value: string) {
 const systemReduced = matchMedia('(prefers-reduced-motion: reduce)')
 
 class Prefs {
-  theme = $state<Theme>(read('sachiva.theme', ['system', 'light', 'dark'], 'system'))
+  theme = $state<Theme>(read('sachiva.theme', ['system', 'light', 'dark', 'glass'], 'system'))
   motion = $state<Motion>(read('sachiva.motion', ['system', 'reduced', 'full'], 'system'))
+  accent = $state<Accent>(read('sachiva.accent', ['theme', 'ocean', 'violet', 'teal'], 'theme'))
+  depth = $state(read('sachiva.effect.depth', ['on', 'off'], 'off') === 'on')
+  dropShadow = $state(read('sachiva.effect.shadow', ['on', 'off'], 'off') === 'on')
+  glow = $state(read('sachiva.effect.glow', ['on', 'off'], 'off') === 'on')
   #systemReduced = $state(systemReduced.matches)
 
   constructor() {
@@ -47,8 +52,17 @@ class Prefs {
     if (this.theme === 'system') delete root.dataset.theme
     else root.dataset.theme = this.theme
     root.dataset.motion = this.reduced ? 'reduced' : 'full'
+    if (this.accent === 'theme') delete root.dataset.accent
+    else root.dataset.accent = this.accent
+    root.dataset.depth = this.depth ? 'on' : 'off'
+    root.dataset.shadow = this.dropShadow ? 'on' : 'off'
+    root.dataset.glow = this.glow ? 'on' : 'off'
     write('sachiva.theme', this.theme)
     write('sachiva.motion', this.motion)
+    write('sachiva.accent', this.accent)
+    write('sachiva.effect.depth', this.depth ? 'on' : 'off')
+    write('sachiva.effect.shadow', this.dropShadow ? 'on' : 'off')
+    write('sachiva.effect.glow', this.glow ? 'on' : 'off')
   }
 }
 

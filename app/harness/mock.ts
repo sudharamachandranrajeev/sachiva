@@ -7,6 +7,9 @@ import demo from './demo.json'
 
 const p = new URLSearchParams(location.hash.slice(1))
 if (p.get('theme')) localStorage.setItem('sachiva.theme', p.get('theme')!)
+if (p.get('effects') === 'all') for (const effect of ['depth', 'shadow', 'glow']) localStorage.setItem(`sachiva.effect.${effect}`, 'on')
+if (p.get('accent')) localStorage.setItem('sachiva.accent', p.get('accent')!)
+if (p.get('motion')) localStorage.setItem('sachiva.motion', p.get('motion')!)
 const mode = p.get('mode') ?? 'ok'
 const clinicEntry = { id: '0192f0c4-0000-7000-8000-000000000011', listId: demo.waitlists[0].id,
   reference: 'REF-A17', target: '2026-11-05', appointmentType: 'Review', minutes: 30,
@@ -89,6 +92,19 @@ if (p.get('edit')) {
   app.editing = { task: t as any, isNew: false }
 }
 if (p.get('capture')) app.capturing = true
+if (p.get('priorities')) app.managingPriorities = true
+if (p.get('calendar')) {
+  app.importingCalendar = true
+  await new Promise((r) => setTimeout(r, 150))
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]')
+  if (input) {
+    const sample = ['BEGIN:VCALENDAR','VERSION:2.0','BEGIN:VEVENT','UID:synthetic-1','SUMMARY:Review stock','DTSTART:20261104T120000Z','DESCRIPTION:Confirm supplier reference','END:VEVENT','END:VCALENDAR'].join('\r\n')
+    const files = new DataTransfer()
+    files.items.add(new File([sample], 'sample.ics', { type: 'text/calendar' }))
+    input.files = files.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+}
 if (p.get('report')) {
   await new Promise((r) => setTimeout(r, 300))
   if (p.get('report') === 'waiting') (document.querySelector('input[value="waitingList"]') as HTMLInputElement)?.click()

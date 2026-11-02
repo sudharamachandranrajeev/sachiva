@@ -2,7 +2,8 @@
   import { onMount } from 'svelte'
   import { api, message, type AlarmAccess, type UpdateMode } from './api'
   import { app } from './state.svelte'
-  import { prefs, type Motion, type Theme } from './prefs.svelte'
+  import { prefs } from './prefs.svelte'
+  import ThemeControls from './ThemeControls.svelte'
 
   // First-run steps after the recovery key. Every step can be skipped, and
   // everything here can be changed later in Settings.
@@ -87,24 +88,7 @@
       <label class="check-row"><input type="radio" bind:group={mode} value="off" /> Do not check</label>
     {:else}
       <h1>Look</h1>
-      <div class="grid">
-        <label class="field">
-          Colours
-          <select bind:value={prefs.theme} onchange={() => prefs.apply()}>
-            {#each [['system', 'Follow the system'], ['light', 'Light'], ['dark', 'Dark']] as [v, name] (v)}
-              <option value={v as Theme}>{name}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="field">
-          Movement
-          <select bind:value={prefs.motion} onchange={() => prefs.apply()}>
-            {#each [['system', 'Follow the system'], ['reduced', 'Calm: as little as possible'], ['full', 'Full']] as [v, name] (v)}
-              <option value={v as Motion}>{name}</option>
-            {/each}
-          </select>
-        </label>
-      </div>
+      <ThemeControls basic />
     {/if}
 
     {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -144,11 +128,6 @@
     font-size: 17px;
     font-weight: 600;
   }
-  .grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-  }
   .status,
   .check-row,
   .row {
@@ -167,10 +146,5 @@
   .error {
     color: var(--urgent);
     font-weight: 600;
-  }
-  @media (max-width: 760px) {
-    .grid {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

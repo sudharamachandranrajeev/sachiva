@@ -31,6 +31,7 @@ warns you if something you type looks like a health number, phone number, birth 
 
 ## ✨ What it does
 
+- 🎨 **Make it yours** – choose Blue glass, light, dark or system colours; mix raised depth, shadows, glow and accent colours.
 - 🗓️ **Import a calendar** – review events and dated tasks from an .ics file before adding them, with duplicate detection and confidentiality warnings.
 - ⏱️ **Focus and time log** – start a timer on a job, stop it when finished, and review recorded sessions on the dashboard. The timer keeps running if the app closes.
 - 📝 **Create from a note** – paste a message, review its suggested title, deadline and priority, then add it. The original note stays with the job; extraction runs offline.
@@ -91,6 +92,8 @@ warns you if something you type looks like a health number, phone number, birth 
     <td align="center">Reports</td>
   </tr>
 </table>
+
+The [Blue glass theme](docs/screenshots/dashboard-glass.png) adds translucent blue surfaces, with optional depth, shadows and glow.
 
 All screenshots use made-up demo data.
 

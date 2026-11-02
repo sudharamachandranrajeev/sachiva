@@ -16,13 +16,16 @@
   --warn-soft: #fbf0cf;
   --ok: #15803d;
   --shadow: 0 1px 2px rgba(22, 48, 43, 0.06), 0 8px 24px rgba(22, 48, 43, 0.06);
+  --effect-depth: 0 0 0 transparent;
+  --effect-shadow: 0 0 0 transparent;
+  --effect-glow: 0 0 0 transparent;
   --r: 18px;
   --font: 'Inter Variable', 'Inter', system-ui, sans-serif;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme]) {
     --bg: #0f1a18;
     --panel: #16231f;
     --panel2: #1a2925;
@@ -61,6 +64,59 @@
   color-scheme: dark;
 }
 
+/* Blue glass uses translucent surfaces over a static gradient. No per-card blur
+   or bitmap layers are needed, keeping the theme light on memory and GPU. */
+:root[data-theme='glass'] {
+  --bg: #dce9fc;
+  --panel: rgba(245, 249, 255, 0.82);
+  --panel2: rgba(229, 239, 255, 0.92);
+  --ink: #11265c;
+  --muted: #455d83;
+  --line: rgba(255, 255, 255, 0.92);
+  --accent: #294ac0;
+  --accent-soft: #d0ddff;
+  --on-accent: #fff;
+  --urgent: #a03617;
+  --urgent-soft: #ffe4dc;
+  --warn: #805400;
+  --warn-soft: #fff0c7;
+  --ok: #096b40;
+  --shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94), 0 7px 20px rgba(58, 90, 157, 0.11);
+  --r: 18px;
+  color-scheme: light;
+}
+:root[data-theme='glass'] body {
+  background: radial-gradient(ellipse at 8% 4%, #d0d7ff 0, transparent 43%),
+    radial-gradient(ellipse at 95% 27%, #bedcf9 0, transparent 42%),
+    radial-gradient(ellipse at 15% 80%, #d5d7fb 0, transparent 42%), #e0edff;
+  background-attachment: fixed;
+}
+:root[data-theme='glass'] dialog { background: #edf4ff; }
+:root[data-theme='glass'] .card { background-image: linear-gradient(145deg, rgba(255,255,255,.22), rgba(194,215,255,.1)); }
+:root[data-depth='on'] { --effect-depth: inset 0 1px 0 rgba(255,255,255,.55), 0 4px 0 rgba(54,79,132,.14); }
+:root[data-shadow='on'] { --effect-shadow: 0 10px 25px rgba(28,48,95,.20); }
+:root[data-glow='on'] { --effect-glow: 0 0 22px rgba(92,125,255,.28); }
+:root[data-accent='ocean'] { --accent: #284bb9; --accent-soft: #dbe6ff; --on-accent: #fff; }
+:root[data-accent='violet'] { --accent: #603eb1; --accent-soft: #e9ddff; --on-accent: #fff; }
+:root[data-accent='teal'] { --accent: #116b61; --accent-soft: #d4f0e9; --on-accent: #fff; }
+:root[data-theme='dark'][data-accent='ocean'] { --accent: #a6bdff; --accent-soft: #26395e; --on-accent: #101e40; }
+:root[data-theme='dark'][data-accent='violet'] { --accent: #d0b4ff; --accent-soft: #3b2c56; --on-accent: #24143c; }
+:root[data-theme='dark'][data-accent='teal'] { --accent: #83d6c2; --accent-soft: #1f413a; --on-accent: #062b23; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme])[data-accent='ocean'] { --accent: #a6bdff; --accent-soft: #26395e; --on-accent: #101e40; }
+  :root:not([data-theme])[data-accent='violet'] { --accent: #d0b4ff; --accent-soft: #3b2c56; --on-accent: #24143c; }
+  :root:not([data-theme])[data-accent='teal'] { --accent: #83d6c2; --accent-soft: #1f413a; --on-accent: #062b23; }
+}
+@media (max-width: 760px) {
+  :root[data-theme='glass'] body { background-attachment: scroll; }
+  :root[data-depth='on'] { --effect-depth: inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 rgba(54,79,132,.12); }
+  :root[data-shadow='on'] { --effect-shadow: 0 5px 12px rgba(28,48,95,.15); }
+  :root[data-glow='on'] { --effect-glow: 0 0 12px rgba(92,125,255,.20); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme='glass'] { --panel: #f1f6ff; --panel2: #e4efff; }
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -83,7 +139,8 @@ body {
 }
 
 :root[data-motion='reduced'] *,
-:root[data-motion='reduced'] *::before {
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
   transition: none !important;
   animation: none !important;
   scroll-behavior: auto !important;
@@ -132,7 +189,7 @@ h3 {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), var(--effect-depth), var(--effect-shadow), var(--effect-glow);
 }
 
 .btn {
@@ -144,6 +201,7 @@ h3 {
   background: var(--panel2);
   transition: background-color 0.15s, transform 0.1s;
   white-space: nowrap;
+  box-shadow: var(--effect-depth), var(--effect-shadow), var(--effect-glow);
 }
 
 .btn:hover {

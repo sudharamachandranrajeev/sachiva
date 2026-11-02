@@ -50,8 +50,8 @@
   <h2 id="calendar-title">Import calendar</h2>
   <p>Choose an .ics file. Events become appointments and calendar tasks with due dates become deadline jobs.</p>
   <p class="muted hint">The file stays on this device. Review entries and use reference codes, not patient details.</p>
-  <label>Calendar file <input type="file" accept=".ics,text/calendar" onchange={readFile} disabled={busy} /></label>
-  {#if fileName}<p class="hint">{fileName}</p>{/if}
+  <label class="btn file-button">Choose .ics file <input class="sr" type="file" accept=".ics,text/calendar" onchange={readFile} disabled={busy} /></label>
+  {#if fileName}<p class="hint">Selected: {fileName}</p>{/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   {#if findings.length}
     <div class="check" role="status"><b>Check for confidential information</b><p>Uncheck an entry to leave it out, or remove the information from the file and choose it again.</p>
@@ -76,6 +76,8 @@
   dialog::backdrop { background: rgba(10, 25, 22, 0.4); }
   p { margin: 8px 0; }
   .hint { font-size: 12px; }
+  .file-button { display: inline-block; cursor: pointer; }
+  .file-button:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
   .entries { display: grid; gap: 8px; }
   .entry { display: flex; align-items: start; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
   .entry input { width: auto; margin-top: 4px; }

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add the Blue glass theme, selectable accent colours, and independently combinable raised depth, shadows and glow. Existing light, dark and system settings remain available.
+
 - Import events and dated tasks from an .ics calendar after preview and confidentiality checks. Duplicate imports are skipped and a batch can be undone. Repeating entries and unknown time zones are reported for review.
 
 - Add and reorder priority levels on the go, and change a saved job’s priority from the dashboard or task list. Very high and Extremely high are included by default.

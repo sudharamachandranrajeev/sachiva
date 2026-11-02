@@ -201,6 +201,18 @@
     top: 0;
     height: 100vh;
   }
+  :global(:root[data-theme='glass']) .rail {
+    margin: 10px 0 10px 10px;
+    height: calc(100vh - 20px);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: var(--panel);
+    box-shadow: var(--shadow), var(--effect-depth), var(--effect-shadow), var(--effect-glow);
+  }
+  :global(:root[data-theme='glass']) .nav.sel {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 4px 12px rgba(54,86,170,.12);
+  }
+  :global(:root[data-theme='glass']) .dock { background-color: #eef4ff; }
   .brand {
     font-weight: 600;
     font-size: 20px;

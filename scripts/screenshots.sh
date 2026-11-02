@@ -28,6 +28,7 @@ shot() { # name width,height hash
 }
 shot dashboard 1280,860 "x=1"
 shot dashboard-dark 1280,860 "theme=dark"
+shot dashboard-glass 1280,900 "theme=glass&motion=reduced"
 shot phone 390,844 "platform=android"
 shot tasks 1280,860 "view=tasks"
 shot editor 1280,1000 "edit=1"
