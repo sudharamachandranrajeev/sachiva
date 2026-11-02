@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Create a job from a pasted note: review suggested title, deadline and priority before saving. The original note is kept and checked for confidential information.
+
 ## [0.3.0]
 
 Clinic workflows (alpha). Updating keeps your jobs and backs up first.
