@@ -46,7 +46,7 @@
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFFNTE0NkM4MUQzMkVBMEQKUldRTjZqSWR5RVpSSHFleUJySk1PTnA4bmxKT21TdjlCSFoyNDlyTkNwZnk1V05Ja1IvSnV6QVUK",
       "requireSignedVersion": true,
       "endpoints": [
-        "https://github.com/sudharamachandranrajeev/sachiva/releases/latest/download/latest.json"
+        "https://github.com/sudharamachandranrajeev/sachiva-admin-assistant/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

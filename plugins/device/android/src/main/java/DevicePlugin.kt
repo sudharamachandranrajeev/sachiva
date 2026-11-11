@@ -180,7 +180,7 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
         }
 
     // Updates come only from Sachiva's own GitHub releases, over HTTPS.
-    private val releases = "https://github.com/sudharamachandranrajeev/sachiva/releases/"
+    private val releases = "https://github.com/sudharamachandranrajeev/sachiva-admin-assistant/releases/"
 
     private fun get(url: String): HttpURLConnection {
         require(url.startsWith(releases)) { "not a Sachiva release address" }

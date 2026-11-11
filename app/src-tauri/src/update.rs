@@ -13,7 +13,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::data::KEEP_PRE_UPDATE;
 use crate::{App, CommandResult, err};
 
-const REPO: &str = "https://github.com/sudharamachandranrajeev/sachiva";
+const REPO: &str = "https://github.com/sudharamachandranrajeev/sachiva-admin-assistant";
 
 /// How this copy of Sachiva was installed, which decides how it updates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

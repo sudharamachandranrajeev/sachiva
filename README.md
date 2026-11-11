@@ -99,7 +99,7 @@ All screenshots use made-up demo data.
 
 ## 🚀 Get started
 
-Download from the [latest release](https://github.com/sudharamachandranrajeev/sachiva/releases/latest). Pick the file for your device:
+Download from the [latest release](https://github.com/sudharamachandranrajeev/sachiva-admin-assistant/releases/latest). Pick the file for your device:
 
 | Device | File | Updates itself |
 | --- | --- | --- |
